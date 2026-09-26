@@ -12,7 +12,7 @@ function runFollowUps() {
     try {
       var firstName = (sponsor.contactName || '').split(' ')[0];
       var body = draftFollowUpEmailBody(sponsor.sponsorName, firstName, sponsor.category);
-      createOutlookDraft(sponsor.contactEmail, 'Following up: partnership opportunity with InnovateHer', body);
+      sendDraftForReview(sponsor.contactEmail, 'Following up: partnership opportunity with InnovateHer', body);
       markFollowUpSent(sponsor.rowNumber);
       followUpsSent.push({ sponsorName: sponsor.sponsorName, contactEmail: sponsor.contactEmail });
     } catch (err) {

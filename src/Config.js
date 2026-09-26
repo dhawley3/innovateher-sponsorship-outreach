@@ -13,6 +13,10 @@ function getDigestRecipient_() {
   return requireProperty_('DIGEST_RECIPIENT_EMAIL');
 }
 
+function getDraftReviewEmail_() {
+  return requireProperty_('DRAFT_REVIEW_EMAIL');
+}
+
 function getMasterListSpreadsheetId_() {
   return requireProperty_('MASTER_LIST_SPREADSHEET_ID');
 }
@@ -23,18 +27,6 @@ function getOutreachGuideDocId_() {
 
 function getEmailTemplateDocId_() {
   return requireProperty_('EMAIL_TEMPLATE_DOC_ID');
-}
-
-function getMicrosoftClientId_() {
-  return requireProperty_('MS_CLIENT_ID');
-}
-
-function getMicrosoftClientSecret_() {
-  return requireProperty_('MS_CLIENT_SECRET');
-}
-
-function getMicrosoftTenantId_() {
-  return requireProperty_('MS_TENANT_ID');
 }
 
 function requireProperty_(key) {

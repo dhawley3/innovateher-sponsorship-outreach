@@ -1,6 +1,6 @@
 /**
  * Main daily job: find uncontacted sponsors, discover contacts via Apollo when the
- * master list doesn't already have one, draft an outreach email, and save it to Outlook.
+ * master list doesn't already have one, draft an outreach email, and send it for review.
  */
 
 // Job titles that qualify a sponsor contact -- adjust to match the outreach guide's categories.
@@ -19,7 +19,7 @@ function runDailyOutreach() {
       }
 
       var body = draftOutreachEmailBody(sponsor.sponsorName, contact.firstName, sponsor.category);
-      createOutlookDraft(contact.email, 'Partnership opportunity with InnovateHer', body);
+      sendDraftForReview(contact.email, 'Partnership opportunity with InnovateHer', body);
       markSponsorContacted(sponsor.rowNumber, contact.name, contact.email);
       draftsCreated.push({ sponsorName: sponsor.sponsorName, contactEmail: contact.email });
     } catch (err) {
