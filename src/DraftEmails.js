@@ -5,9 +5,7 @@
  * clearly labeled as a draft, so they can copy it into a new message and send it.
  */
 
-function sendDraftForReview(sponsorContactEmail, subject, body) {
-  var reviewer = getDraftReviewEmail_();
-
+function sendDraftForReview(reviewerEmail, sponsorContactEmail, subject, body) {
   var wrappedBody = [
     '[DRAFT - review before sending]',
     'Intended recipient: ' + sponsorContactEmail,
@@ -19,7 +17,7 @@ function sendDraftForReview(sponsorContactEmail, subject, body) {
   ].join('\n');
 
   MailApp.sendEmail({
-    to: reviewer,
+    to: reviewerEmail,
     subject: '[DRAFT] ' + subject,
     body: wrappedBody
   });

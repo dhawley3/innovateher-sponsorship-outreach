@@ -13,10 +13,6 @@ function getDigestRecipient_() {
   return requireProperty_('DIGEST_RECIPIENT_EMAIL');
 }
 
-function getDraftReviewEmail_() {
-  return requireProperty_('DRAFT_REVIEW_EMAIL');
-}
-
 function getMasterListSpreadsheetId_() {
   return requireProperty_('MASTER_LIST_SPREADSHEET_ID');
 }
@@ -48,7 +44,8 @@ var MASTER_LIST_COLUMNS = {
   CONTACT_NAME: 2,
   CONTACT_EMAIL: 3,
   STATUS: 4, // "Not Contacted" | "Contacted" | "Responded"
-  DATE_CONTACTED: 5,
-  DATE_FOLLOW_UP_SENT: 6,
-  NOTES: 7
+  RESPONSIBLE: 5,
+  DATE_CONTACTED: 6,
+  DATE_FOLLOW_UP_SENT: 7,
+  NOTES: 8
 };

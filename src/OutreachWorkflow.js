@@ -12,6 +12,12 @@ function runDailyOutreach() {
 
   sponsors.forEach(function (sponsor) {
     try {
+      var reviewerEmail = getResponsibleEmail_(sponsor.responsible);
+      if (!reviewerEmail) {
+        Logger.log('No Purdue email on file for "' + sponsor.responsible + '" (add them to the Team Emails sheet), skipping ' + sponsor.sponsorName);
+        return;
+      }
+
       var contact = resolveSponsorContact_(sponsor);
       if (!contact) {
         Logger.log('No contact found for ' + sponsor.sponsorName + ', skipping.');
@@ -19,7 +25,7 @@ function runDailyOutreach() {
       }
 
       var body = draftOutreachEmailBody(sponsor.sponsorName, contact.firstName, sponsor.category);
-      sendDraftForReview(contact.email, 'Partnership opportunity with InnovateHer', body);
+      sendDraftForReview(reviewerEmail, contact.email, 'Partnership opportunity with InnovateHer', body);
       markSponsorContacted(sponsor.rowNumber, contact.name, contact.email);
       draftsCreated.push({ sponsorName: sponsor.sponsorName, contactEmail: contact.email });
     } catch (err) {

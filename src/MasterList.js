@@ -30,7 +30,8 @@ function getUncontactedSponsors() {
         sponsorName: row[cols.SPONSOR_NAME],
         category: row[cols.CATEGORY],
         contactName: row[cols.CONTACT_NAME],
-        contactEmail: row[cols.CONTACT_EMAIL]
+        contactEmail: row[cols.CONTACT_EMAIL],
+        responsible: row[cols.RESPONSIBLE]
       });
     }
   }
@@ -62,6 +63,7 @@ function getSponsorsAwaitingResponse(minDaysAgo) {
         category: row[cols.CATEGORY],
         contactName: row[cols.CONTACT_NAME],
         contactEmail: row[cols.CONTACT_EMAIL],
+        responsible: row[cols.RESPONSIBLE],
         dateContacted: dateContacted
       });
     }
