@@ -45,3 +45,29 @@ var CATEGORY_SHEET_NAMES = [
   'Women-Owned',
   'Local Businesses'
 ];
+
+/**
+ * Maps each category tab to its section heading in the Email Template Doc.
+ * Order matters: it's also used to find where one section ends and the next
+ * begins when the whole doc is one long file with multiple templates in it.
+ */
+var CATEGORY_TEMPLATE_HEADINGS = {
+  'Warm Contacts': 'WARM CONTACTS (PRIOR RELATIONSHIP)',
+  'Mass Monetary Sponsors': 'MASS MONETARY SPONSORS (COLD OUTREACH)',
+  'In-Kind Sponsors': 'IN-KIND SPONSORS',
+  'Women-Owned': 'WOMEN-OWNED / WOMEN-LED BUSINESSES',
+  'Local Businesses': 'LOCAL INDIANA BUSINESSES'
+};
+
+var FOLLOW_UP_TEMPLATE_HEADING = '1ST FOLLOW-UP (10 DAYS)';
+
+var ALL_TEMPLATE_HEADINGS_IN_DOC_ORDER = [
+  'WARM CONTACTS (PRIOR RELATIONSHIP)',
+  'MASS MONETARY SPONSORS (COLD OUTREACH)',
+  'IN-KIND SPONSORS',
+  'WOMEN-OWNED / WOMEN-LED BUSINESSES',
+  'LOCAL INDIANA BUSINESSES',
+  'FOLLOW-UP GUIDELINES',
+  '1ST FOLLOW-UP (10 DAYS)',
+  '2ND FOLLOW-UP (20 DAYS)'
+];

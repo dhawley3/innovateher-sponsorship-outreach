@@ -38,8 +38,8 @@ function runDailyOutreach() {
           return;
         }
 
-        var body = draftOutreachEmailBody(sponsor.sponsorName, contact.firstName, sponsor.category);
-        sendDraftForReview(reviewerEmail, contact.email, 'Partnership opportunity with InnovateHer', body);
+        var draft = draftOutreachEmail(sponsor.sponsorName, contact.firstName || 'there', sponsor.category, sponsor.responsible);
+        sendDraftForReview(reviewerEmail, contact.email, draft.subject, draft.body);
         markDraftCreated(sponsor.sheetName, sponsor.rowNumber, contact.name, contact.email);
         emailsHandledThisRun[emailKey] = true;
         draftsCreated.push({ sponsorName: sponsor.sponsorName, contactEmail: contact.email });

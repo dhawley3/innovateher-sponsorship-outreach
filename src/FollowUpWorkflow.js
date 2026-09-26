@@ -41,9 +41,9 @@ function runFollowUpsInternal_() {
         return;
       }
 
-      var firstName = (sponsor.contactName || '').split(' ')[0];
-      var body = draftFollowUpEmailBody(sponsor.sponsorName, firstName, sponsor.category);
-      sendDraftForReview(reviewerEmail, sponsor.contactEmail, 'Following up: partnership opportunity with InnovateHer', body);
+      var firstName = (sponsor.contactName || '').split(' ')[0] || 'there';
+      var draft = draftFollowUpEmail(sponsor.sponsorName, firstName, sponsor.responsible);
+      sendDraftForReview(reviewerEmail, sponsor.contactEmail, draft.subject, draft.body);
       markFollowUpSent(sponsor.sheetName, sponsor.rowNumber);
       if (emailKey) emailsHandledThisRun[emailKey] = true;
       followUpsSent.push({ sponsorName: sponsor.sponsorName, contactEmail: sponsor.contactEmail });
