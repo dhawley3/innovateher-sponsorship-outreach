@@ -43,7 +43,9 @@ function getAlreadyContactedEmails_() {
     for (var i = 1; i < values.length; i++) {
       var row = values[i];
       var email = String(row[emailCol] || '').trim().toLowerCase();
-      if (email && (row[statusCol] || row[lastContactCol])) {
+      var status = row[statusCol];
+      var isHandled = (status && status !== 'Brainstormed') || row[lastContactCol];
+      if (email && isHandled) {
         emails[email] = true;
       }
     }
