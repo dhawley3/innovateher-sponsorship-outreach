@@ -74,7 +74,8 @@ function fillPlaceholders_(text, fields) {
     .replace(/\[morning\/afternoon\/evening\]/gi, greetingForTimeOfDay_())
     .replace(/\[company name\]/gi, fields.sponsorName)
     .replace(/\[name\]/gi, fields.contactFirstName)
-    .replace(/\[your full name\]/gi, fields.senderName);
+    .replace(/\[your full name\]/gi, fields.senderName)
+    .replace(/\[your name\]/gi, fields.senderName);
 }
 
 /**
