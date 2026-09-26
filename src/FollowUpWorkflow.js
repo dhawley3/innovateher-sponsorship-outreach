@@ -4,9 +4,28 @@
 
 var FOLLOW_UP_WAIT_DAYS = 7;
 
+/**
+ * Menu-facing entry point -- acquires its own lock, since it can run independently
+ * of runDailyOutreach (which already holds the lock when it calls runFollowUpsInternal_ directly).
+ */
 function runFollowUps() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) {
+    Logger.log('Another run is already in progress, skipping this one.');
+    return [];
+  }
+
+  try {
+    return runFollowUpsInternal_();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function runFollowUpsInternal_() {
   var pending = getSponsorsAwaitingResponse(FOLLOW_UP_WAIT_DAYS);
   var followUpsSent = [];
+  var emailsHandledThisRun = {};
 
   pending.forEach(function (sponsor) {
     try {
@@ -16,10 +35,17 @@ function runFollowUps() {
         return;
       }
 
+      var emailKey = String(sponsor.contactEmail || '').toLowerCase();
+      if (emailKey && emailsHandledThisRun[emailKey]) {
+        Logger.log(sponsor.contactEmail + ' already got a follow-up drafted earlier in this run, skipping ' + sponsor.sponsorName);
+        return;
+      }
+
       var firstName = (sponsor.contactName || '').split(' ')[0];
       var body = draftFollowUpEmailBody(sponsor.sponsorName, firstName, sponsor.category);
       sendDraftForReview(reviewerEmail, sponsor.contactEmail, 'Following up: partnership opportunity with InnovateHer', body);
-      markFollowUpSent(sponsor.rowNumber);
+      markFollowUpSent(sponsor.sheetName, sponsor.rowNumber);
+      if (emailKey) emailsHandledThisRun[emailKey] = true;
       followUpsSent.push({ sponsorName: sponsor.sponsorName, contactEmail: sponsor.contactEmail });
     } catch (err) {
       Logger.log('Failed to draft follow-up for ' + sponsor.sponsorName + ': ' + err.message);

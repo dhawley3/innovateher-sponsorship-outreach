@@ -7,34 +7,52 @@
 var SPONSOR_CONTACT_TITLES = ['Partnerships', 'Sponsorship', 'Marketing', 'Community Relations', 'CSR'];
 
 function runDailyOutreach() {
-  var sponsors = getUncontactedSponsors();
-  var draftsCreated = [];
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) {
+    Logger.log('Another run is already in progress, skipping this one.');
+    return;
+  }
 
-  sponsors.forEach(function (sponsor) {
-    try {
-      var reviewerEmail = getResponsibleEmail_(sponsor.responsible);
-      if (!reviewerEmail) {
-        Logger.log('No Purdue email on file for "' + sponsor.responsible + '" (add them to the Team Emails sheet), skipping ' + sponsor.sponsorName);
-        return;
+  try {
+    var sponsors = getUncontactedSponsors();
+    var draftsCreated = [];
+    var emailsHandledThisRun = {};
+
+    sponsors.forEach(function (sponsor) {
+      try {
+        var reviewerEmail = getResponsibleEmail_(sponsor.responsible);
+        if (!reviewerEmail) {
+          Logger.log('No Purdue email on file for "' + sponsor.responsible + '" (add them to the Team Emails sheet), skipping ' + sponsor.sponsorName);
+          return;
+        }
+
+        var contact = resolveSponsorContact_(sponsor);
+        if (!contact) {
+          Logger.log('No contact found for ' + sponsor.sponsorName + ', skipping.');
+          return;
+        }
+
+        var emailKey = contact.email.toLowerCase();
+        if (emailsHandledThisRun[emailKey]) {
+          Logger.log(contact.email + ' was already drafted to earlier in this run, skipping ' + sponsor.sponsorName);
+          return;
+        }
+
+        var body = draftOutreachEmailBody(sponsor.sponsorName, contact.firstName, sponsor.category);
+        sendDraftForReview(reviewerEmail, contact.email, 'Partnership opportunity with InnovateHer', body);
+        markSponsorContacted(sponsor.sheetName, sponsor.rowNumber, contact.name, contact.email);
+        emailsHandledThisRun[emailKey] = true;
+        draftsCreated.push({ sponsorName: sponsor.sponsorName, contactEmail: contact.email });
+      } catch (err) {
+        Logger.log('Failed to process ' + sponsor.sponsorName + ': ' + err.message);
       }
+    });
 
-      var contact = resolveSponsorContact_(sponsor);
-      if (!contact) {
-        Logger.log('No contact found for ' + sponsor.sponsorName + ', skipping.');
-        return;
-      }
-
-      var body = draftOutreachEmailBody(sponsor.sponsorName, contact.firstName, sponsor.category);
-      sendDraftForReview(reviewerEmail, contact.email, 'Partnership opportunity with InnovateHer', body);
-      markSponsorContacted(sponsor.rowNumber, contact.name, contact.email);
-      draftsCreated.push({ sponsorName: sponsor.sponsorName, contactEmail: contact.email });
-    } catch (err) {
-      Logger.log('Failed to process ' + sponsor.sponsorName + ': ' + err.message);
-    }
-  });
-
-  var followUpsSent = runFollowUps();
-  sendDailyDigest(draftsCreated, followUpsSent);
+    var followUpsSent = runFollowUpsInternal_();
+    sendDailyDigest(draftsCreated, followUpsSent);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**

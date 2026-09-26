@@ -34,18 +34,14 @@ function requireProperty_(key) {
 }
 
 /**
- * Assumed column layout for the "Master List" sheet tab.
- * Adjust these indices (0-based) to match the real sheet before running anything.
+ * Category tabs in the master list spreadsheet that get automated outreach.
+ * "Purdue Funding" is excluded on purpose -- internal grants/departments, not
+ * cold sponsor outreach, and there's no matching email template for it.
  */
-var MASTER_LIST_SHEET_NAME = 'Master List';
-var MASTER_LIST_COLUMNS = {
-  SPONSOR_NAME: 0,
-  CATEGORY: 1,
-  CONTACT_NAME: 2,
-  CONTACT_EMAIL: 3,
-  STATUS: 4, // "Not Contacted" | "Contacted" | "Responded"
-  RESPONSIBLE: 5,
-  DATE_CONTACTED: 6,
-  DATE_FOLLOW_UP_SENT: 7,
-  NOTES: 8
-};
+var CATEGORY_SHEET_NAMES = [
+  'Warm Contacts',
+  'Mass Monetary Sponsors',
+  'In-Kind Sponsors',
+  'Women-Owned',
+  'Local Businesses'
+];

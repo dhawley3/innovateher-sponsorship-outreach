@@ -5,7 +5,7 @@ that automates sponsor outreach for the InnovateHer hackathon finance team.
 
 ## What it does
 
-1. Reads the outreach master list (a Sheet in the InnovateHer Drive) to find sponsors not yet contacted.
+1. Reads the outreach master list (a Sheet in the InnovateHer Drive, across its 5 sponsor category tabs) to find sponsors not yet contacted, skipping anyone whose contact email is already logged as contacted anywhere else in the sheet.
 2. Uses the Apollo.io API to find contacts at those sponsor organizations.
 3. Finds additional sponsor contacts outside the master list that fit a target category.
 4. Uses the sponsorship outreach guide + final email template (Docs in Drive) to draft a personalized email.
@@ -24,6 +24,7 @@ that automates sponsor outreach for the InnovateHer hackathon finance team.
 | Name → Outlook email lookup | "Team Emails" tab in the master list spreadsheet (add/remove people directly in the Sheet, no code changes) |
 | Daily digest | Sent via the Apps Script account's Gmail (`MailApp`) to whatever address you configure — works regardless of the recipient's mail provider |
 | Scheduling | Apps Script time-driven triggers |
+| Duplicate prevention | A contact email already logged (non-blank Status or Last Contact) anywhere in the master list is skipped; a `LockService` script lock also stops overlapping runs (e.g. a manual run colliding with the daily trigger) from double-drafting |
 
 **Why not real Outlook drafts:** creating an actual draft in someone's Outlook mailbox
 requires the Microsoft Graph API, which needs an Azure AD app registration in the
@@ -41,11 +42,13 @@ script, view logs, or trigger a manual run — no separate hosting account neede
 
 Scaffolding only right now. Still open:
 
-- [ ] Confirm the master list Sheet's column layout (`src/Config.js` documents the assumed schema — the real sheet has multiple category tabs (Warm Contacts, Mass Monetary Sponsors, In-Kind Sponsors, Women-Owned, Local Businesses), each mapping to one of the 5 templates in the outreach guide; `Purdue Funding` is excluded from automation for now. This still needs a proper rewrite.)
+- [x] Read the real master list schema across its 5 category tabs, by header name (`src/MasterList.js`) — `Purdue Funding` is excluded from automation on purpose
+- [x] Bind this project to a real Apps Script deployment (`clasp create` via the Sheet's Extensions menu) and fill in `.clasp.json`
 - [ ] Apollo.io API key, scoped to `mixed_companies/search`, `mixed_people/api_search`, `people/match` (created — add to Script Properties, not code)
-- [ ] Bind this project to a real Apps Script deployment (`clasp create`) and fill in `.clasp.json`
-- [ ] Set `DIGEST_RECIPIENT_EMAIL` Script Property
+- [ ] Set `DIGEST_RECIPIENT_EMAIL` Script Property (comma-separate multiple addresses)
 - [ ] Fill in the "Team Emails" tab (Name, Purdue Email) for each Responsible person — use the Sheet's menu: **Sponsorship Outreach → Set up / open Team Emails sheet**
+- [ ] Each category's email is still filled from one generic template (`src/Templates.js`) rather than the 5 distinct category templates in the outreach guide doc — not yet split out
+- [ ] Apollo contact-title search still uses a generic title list rather than the guide's priority tiers (University Recruiter first, etc.)
 
 ## Local setup (clasp)
 
