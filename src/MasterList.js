@@ -26,9 +26,9 @@ function headerIndex_(headerRow, columnName) {
 
 /**
  * Every contact email already appearing anywhere in the master list with a non-blank
- * Status or Last Contact -- i.e. someone has already reached out to them, regardless
- * of which category tab or row that happened in. Used to stop the same person from
- * getting a second, independent outreach draft.
+ * Status or Last Contact -- i.e. someone already has a draft out or has actually been
+ * contacted, regardless of which category tab or row that happened in. Used to stop
+ * the same person from getting a second, independent outreach draft.
  */
 function getAlreadyContactedEmails_() {
   var emails = {};
@@ -53,8 +53,8 @@ function getAlreadyContactedEmails_() {
 }
 
 /**
- * Returns rows (by category tab + row number) for sponsors not yet contacted:
- * blank status or "Brainstormed", and not already contacted elsewhere under a
+ * Returns rows (by category tab + row number) for sponsors not yet drafted or contacted:
+ * blank status or "Brainstormed", and not already drafted/contacted elsewhere under a
  * different row/tab.
  */
 function getUncontactedSponsors() {
@@ -135,15 +135,20 @@ function getSponsorsAwaitingResponse(minDaysAgo) {
   return results;
 }
 
-function markSponsorContacted(sheetName, rowNumber, contactName, contactEmail) {
+/**
+ * Records that a draft went out for review -- never "Contacted". Only a human marking
+ * the sheet themselves after actually reviewing and sending should set Status to
+ * "Contacted" or fill in Last Contact; the script only ever sets "Drafted", which also
+ * doubles as this row's own signal to not draft it again on a future run.
+ */
+function markDraftCreated(sheetName, rowNumber, contactName, contactEmail) {
   var ss = SpreadsheetApp.openById(getMasterListSpreadsheetId_());
   var sheet = ss.getSheetByName(sheetName);
   var header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
 
   sheet.getRange(rowNumber, headerIndex_(header, 'Point of Contact') + 1).setValue(contactName);
   sheet.getRange(rowNumber, headerIndex_(header, 'Email') + 1).setValue(contactEmail);
-  sheet.getRange(rowNumber, headerIndex_(header, 'Status') + 1).setValue('Contacted');
-  sheet.getRange(rowNumber, headerIndex_(header, 'Last Contact') + 1).setValue(new Date());
+  sheet.getRange(rowNumber, headerIndex_(header, 'Status') + 1).setValue('Drafted');
 }
 
 function markFollowUpSent(sheetName, rowNumber) {

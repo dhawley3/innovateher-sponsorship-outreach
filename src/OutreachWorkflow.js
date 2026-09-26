@@ -40,7 +40,7 @@ function runDailyOutreach() {
 
         var body = draftOutreachEmailBody(sponsor.sponsorName, contact.firstName, sponsor.category);
         sendDraftForReview(reviewerEmail, contact.email, 'Partnership opportunity with InnovateHer', body);
-        markSponsorContacted(sponsor.sheetName, sponsor.rowNumber, contact.name, contact.email);
+        markDraftCreated(sponsor.sheetName, sponsor.rowNumber, contact.name, contact.email);
         emailsHandledThisRun[emailKey] = true;
         draftsCreated.push({ sponsorName: sponsor.sponsorName, contactEmail: contact.email });
       } catch (err) {
