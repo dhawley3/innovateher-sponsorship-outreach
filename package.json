@@ -6,7 +6,8 @@
     "login": "clasp login",
     "push": "clasp push",
     "pull": "clasp pull",
-    "open": "clasp open"
+    "open": "clasp open",
+    "status": "node status/server.js"
   },
   "devDependencies": {
     "@google/clasp": "^2.4.2"
