@@ -1,0 +1,14 @@
+{
+  "name": "innovateher-sponsorship-outreach",
+  "private": true,
+  "description": "Apps Script automation for InnovateHer sponsorship outreach",
+  "scripts": {
+    "login": "clasp login",
+    "push": "clasp push",
+    "pull": "clasp pull",
+    "open": "clasp open"
+  },
+  "devDependencies": {
+    "@google/clasp": "^2.4.2"
+  }
+}
