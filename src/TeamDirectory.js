@@ -17,7 +17,16 @@ function ensureTeamDirectorySheet_() {
   return sheet;
 }
 
+var teamDirectoryCache_ = null;
+
+/**
+ * Cached for the lifetime of a single execution -- getResponsibleEmail_ is called
+ * once per sponsor row (hundreds of times per run), and re-reading the sheet that
+ * often was the main reason a full run took minutes.
+ */
 function getTeamDirectory_() {
+  if (teamDirectoryCache_) return teamDirectoryCache_;
+
   var sheet = ensureTeamDirectorySheet_();
   var values = sheet.getDataRange().getValues();
   var directory = {};
@@ -29,6 +38,8 @@ function getTeamDirectory_() {
       directory[name] = email;
     }
   }
+
+  teamDirectoryCache_ = directory;
   return directory;
 }
 
