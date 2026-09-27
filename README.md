@@ -38,6 +38,36 @@ Runs as a container-bound Apps Script attached to a Sheet living in the shared I
 Drive folder, so anyone on the finance team with edit access to that Sheet can open the
 script, view logs, or trigger a manual run — no separate hosting account needed.
 
+## Schedule
+
+Installed via the Sheet menu **Sponsorship Outreach → Install triggers** (`installTriggers` in `src/Triggers.js`); times are America/New_York.
+
+| Trigger | When | What it does |
+|---|---|---|
+| `runDailyProspecting` | Daily, ~7am | Finds new companies via Apollo (see budget below), looks up one contact per company once, appends them with a blank Responsible |
+| `runScheduledOutreach` | Hourly, 8am–midnight | Drafts outreach for rows whose Responsible is in the Team Emails tab |
+| `sendScheduledDigest` | Daily, ~3pm | Emails drafts, follow-ups, and new prospects logged since the previous 3pm digest |
+
+## Apollo credit budget
+
+Prospecting is front-loaded against the Apollo credit cycle (300 credits, renews **Oct 26**),
+based on a test run costing ~1.7 credits per company searched with ~1 in 3 yielding a contact.
+The daily target changes automatically by date (`DAILY_PROSPECT_SCHEDULE` in `src/Prospecting.js`)
+and is split between Local Businesses and In-Kind Sponsors.
+
+| Period | Companies/day | Credits used | Contacts expected |
+|---|---|---|---|
+| 9/27 – 10/3 (7 days) | 8 | ~95 | ~19 |
+| 10/4 – 10/10 (7 days) | 6 | ~70 | ~14 |
+| 10/11 – 10/25 (15 days) | 3 | ~75 | ~15 |
+| **Total** | **143 companies** | **~240** | **~48 contacts** |
+
+~60 credits are held in reserve for contact lookups on existing rows that have no email
+(each row is searched at most once — see the `[Apollo contact search …]` marker in Notes).
+Check the Apollo balance after the first week: if well above ~205 remaining, raise the later
+tiers; if below, lower them. After 10/25 the last tier (3/day) keeps applying until the
+schedule is updated for the next cycle.
+
 ## Status
 
 Scaffolding only right now. Still open:
@@ -48,7 +78,7 @@ Scaffolding only right now. Still open:
 - [ ] Set `DIGEST_RECIPIENT_EMAIL` Script Property (comma-separate multiple addresses)
 - [ ] Fill in the "Team Emails" tab (Name, Purdue Email) for each Responsible person — use the Sheet's menu: **Sponsorship Outreach → Set up / open Team Emails sheet**
 - [ ] Each category's email is still filled from one generic template (`src/Templates.js`) rather than the 5 distinct category templates in the outreach guide doc — not yet split out
-- [ ] Apollo contact-title search still uses a generic title list rather than the guide's priority tiers (University Recruiter first, etc.)
+- [x] Apollo contact-title search ranks results by the guide's priority tiers (University Recruiter first, etc.)
 
 ## Local setup (clasp)
 

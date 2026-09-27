@@ -42,8 +42,8 @@ function runFollowUpsInternal_() {
       }
 
       var firstName = (sponsor.contactName || '').split(' ')[0] || 'there';
-      var draft = draftFollowUpEmail(sponsor.sponsorName, firstName, sponsor.responsible);
-      sendDraftForReview(reviewerEmail, sponsor.contactEmail, draft.subject, draft.body);
+      var draft = draftFollowUpEmail(sponsor.sponsorName, firstName, getResponsibleDisplayName_(sponsor.responsible));
+      saveDraftForReview(sponsor.responsible, reviewerEmail, sponsor.contactEmail, draft.subject, draft.body);
       markFollowUpSent(sponsor.sheetName, sponsor.rowNumber);
       if (emailKey) emailsHandledThisRun[emailKey] = true;
       followUpsSent.push({ sponsorName: sponsor.sponsorName, contactEmail: sponsor.contactEmail });

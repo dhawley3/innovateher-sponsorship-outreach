@@ -70,6 +70,7 @@ function getUncontactedSponsors() {
     var statusCol = headerIndex_(header, 'Status');
     var responsibleCol = headerIndex_(header, 'Responsible');
     var pocCol = headerIndex_(header, 'Point of Contact');
+    var notesCol = headerIndex_(header, 'Notes');
 
     for (var i = 1; i < values.length; i++) {
       var row = values[i];
@@ -85,7 +86,8 @@ function getUncontactedSponsors() {
           sponsorName: row[0],
           contactName: row[pocCol],
           contactEmail: email,
-          responsible: row[responsibleCol]
+          responsible: row[responsibleCol],
+          notes: String(row[notesCol] || '').trim()
         });
       }
     }
@@ -151,6 +153,15 @@ function markDraftCreated(sheetName, rowNumber, contactName, contactEmail) {
   sheet.getRange(rowNumber, headerIndex_(header, 'Point of Contact') + 1).setValue(contactName);
   sheet.getRange(rowNumber, headerIndex_(header, 'Email') + 1).setValue(contactEmail);
   sheet.getRange(rowNumber, headerIndex_(header, 'Status') + 1).setValue('Drafted');
+}
+
+function appendRowNote_(sheetName, rowNumber, text) {
+  var ss = SpreadsheetApp.openById(getMasterListSpreadsheetId_());
+  var sheet = ss.getSheetByName(sheetName);
+  var header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var cell = sheet.getRange(rowNumber, headerIndex_(header, 'Notes') + 1);
+  var existing = String(cell.getValue() || '').trim();
+  cell.setValue(existing ? existing + ' ' + text : text);
 }
 
 function markFollowUpSent(sheetName, rowNumber) {

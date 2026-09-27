@@ -31,11 +31,13 @@ function getTeamDirectory_() {
   var values = sheet.getDataRange().getValues();
   var directory = {};
 
+  // Keyed by the Name cell's first word so "Drew Hawley" still matches Responsible = "Drew";
+  // the full cell is what gets signed on drafts.
   for (var i = 1; i < values.length; i++) {
-    var name = String(values[i][0] || '').trim().toLowerCase();
+    var fullName = String(values[i][0] || '').trim();
     var email = String(values[i][1] || '').trim();
-    if (name && email) {
-      directory[name] = email;
+    if (fullName && email) {
+      directory[fullName.split(/\s+/)[0].toLowerCase()] = { email: email, fullName: fullName };
     }
   }
 
@@ -48,7 +50,20 @@ function getTeamDirectory_() {
  * person hasn't been added to the Team Emails tab yet.
  */
 function getResponsibleEmail_(name) {
-  var directory = getTeamDirectory_();
-  var key = String(name || '').trim().toLowerCase();
-  return directory[key] || null;
+  var entry = getTeamDirectoryEntry_(name);
+  return entry ? entry.email : null;
+}
+
+/**
+ * The name to sign drafts with -- the Team Emails Name cell as written (e.g. "Drew Hawley"),
+ * falling back to the Responsible value if that person isn't in the tab.
+ */
+function getResponsibleDisplayName_(name) {
+  var entry = getTeamDirectoryEntry_(name);
+  return entry ? entry.fullName : String(name || '').trim();
+}
+
+function getTeamDirectoryEntry_(name) {
+  var key = String(name || '').trim().split(/\s+/)[0].toLowerCase();
+  return getTeamDirectory_()[key] || null;
 }

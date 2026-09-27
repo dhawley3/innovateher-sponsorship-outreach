@@ -5,6 +5,11 @@
  * [Company Name], [Name], [Your Full Name], [morning/afternoon/evening].
  */
 
+// Replaces every category template's own opening paragraph, so all outreach drafts
+// start the same way regardless of what the template Doc says.
+var STANDARD_OUTREACH_OPENER = 'My name is [Your Name], and I’m part of the team organizing InnovateHer at Purdue University. ' +
+  'I’m reaching out to introduce an opportunity for [COMPANY NAME] to engage with a highly motivated and underrepresented student talent pool.';
+
 function getEmailTemplateFullText_() {
   var doc = DocumentApp.openById(getEmailTemplateDocId_());
   return doc.getBody().getText();
@@ -62,16 +67,11 @@ function splitSubjectAndBody_(sectionText) {
   return { subject: subject, body: body };
 }
 
-function greetingForTimeOfDay_() {
-  var hour = new Date().getHours();
-  if (hour < 12) return 'morning';
-  if (hour < 17) return 'afternoon';
-  return 'evening';
-}
-
+// Fixed rather than time-of-day: drafts are created by an hourly trigger but sent whenever
+// the teammate reviews them, so the creation time says nothing about when it's read.
 function fillPlaceholders_(text, fields) {
   return text
-    .replace(/\[morning\/afternoon\/evening\]/gi, greetingForTimeOfDay_())
+    .replace(/\[morning\/afternoon\/evening\]/gi, 'afternoon')
     .replace(/\[company name\]/gi, fields.sponsorName)
     .replace(/\[name\]/gi, fields.contactFirstName)
     .replace(/\[your full name\]/gi, fields.senderName)
@@ -79,10 +79,20 @@ function fillPlaceholders_(text, fields) {
 }
 
 /**
+ * Google Docs joins paragraphs with a single "\n" (the visual gap between paragraphs is
+ * just paragraph spacing, not a blank line in the text), so plain-text emails built
+ * straight from doc.getBody().getText() read as one run-on block. Insert a blank line
+ * between every paragraph so the sent email actually has visible spacing.
+ */
+function addParagraphSpacing_(text) {
+  return text.replace(/\r\n/g, '\n').split('\n').join('\n\n');
+}
+
+/**
  * Returns { subject, body }, both fully filled in and ready to send, for the given
  * category's cold-outreach template.
  */
-function draftOutreachEmail(sponsorName, contactFirstName, category, senderName) {
+function draftOutreachEmail(sponsorName, contactFirstName, category, senderName, notes) {
   var heading = CATEGORY_TEMPLATE_HEADINGS[category];
   if (!heading) {
     throw new Error('No email template mapped for category "' + category + '".');
@@ -91,10 +101,14 @@ function draftOutreachEmail(sponsorName, contactFirstName, category, senderName)
   var section = extractTemplateSection_(getEmailTemplateFullText_(), heading);
   var split = splitSubjectAndBody_(section);
   var fields = { sponsorName: sponsorName, contactFirstName: contactFirstName, senderName: senderName };
+  var body = mapIntroParagraph_(fillPlaceholders_(split.body, fields), function () {
+    return fillPlaceholders_(STANDARD_OUTREACH_OPENER, fields);
+  });
+  var personalization = generateBrandPersonalization_(sponsorName, category, notes, getIntroParagraph_(body));
 
   return {
     subject: fillPlaceholders_(split.subject, fields) || ('Partnership opportunity with InnovateHer'),
-    body: fillPlaceholders_(split.body, fields)
+    body: addParagraphSpacing_(insertPersonalization_(body, personalization))
   };
 }
 
@@ -110,6 +124,6 @@ function draftFollowUpEmail(sponsorName, contactFirstName, senderName) {
 
   return {
     subject: fillPlaceholders_(split.subject, fields) || 'Following up: partnership opportunity with InnovateHer',
-    body: fillPlaceholders_(split.body, fields)
+    body: addParagraphSpacing_(fillPlaceholders_(split.body, fields))
   };
 }

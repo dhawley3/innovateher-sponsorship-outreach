@@ -59,6 +59,23 @@ var CATEGORY_TEMPLATE_HEADINGS = {
   'Local Businesses': 'LOCAL INDIANA BUSINESSES'
 };
 
+/**
+ * Apollo mixed_companies/search filters used to discover brand-new prospect companies
+ * (not just enrich contacts at already-known companies). Only built for categories with
+ * a reasonably reliable search signal -- geography for Local Businesses, product/industry
+ * keywords for In-Kind Sponsors. Not built for Women-Owned: Apollo has no dedicated
+ * "women-owned" company filter, only unreliable keyword-tag guessing.
+ */
+var CATEGORY_DISCOVERY_CRITERIA = {
+  'Local Businesses': {
+    organization_locations: ['indiana'],
+    organization_num_employees_ranges: ['1,50']
+  },
+  'In-Kind Sponsors': {
+    q_organization_keyword_tags: ['consumer products', 'cosmetics', 'beverage', 'apparel', 'accessories']
+  }
+};
+
 var FOLLOW_UP_TEMPLATE_HEADING = '1ST FOLLOW-UP (10 DAYS)';
 
 var ALL_TEMPLATE_HEADINGS_IN_DOC_ORDER = [

@@ -6,6 +6,6 @@ function onOpen() {
     .addSeparator()
     .addItem('Set up / open Team Emails sheet', 'ensureTeamDirectorySheet_')
     .addSeparator()
-    .addItem('Install daily trigger', 'createDailyTrigger')
+    .addItem('Install triggers (7am prospecting, hourly outreach, 3pm digest)', 'installTriggers')
     .addToUi();
 }

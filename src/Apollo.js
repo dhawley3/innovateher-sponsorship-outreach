@@ -40,11 +40,11 @@ function apolloFindOrganization(sponsorName) {
  * (e.g. partnerships, marketing, community relations).
  */
 function apolloFindPeopleAtOrganization(organizationId, titleKeywords) {
-  var result = apolloRequest_('/mixed_people/search', {
+  var result = apolloRequest_('/mixed_people/api_search', {
     organization_ids: [organizationId],
     person_titles: titleKeywords,
     page: 1,
-    per_page: 5
+    per_page: 25
   });
   return result.people || [];
 }

@@ -3,8 +3,17 @@
  * master list doesn't already have one, draft an outreach email, and send it for review.
  */
 
-// Job titles that qualify a sponsor contact -- adjust to match the outreach guide's categories.
-var SPONSOR_CONTACT_TITLES = ['Partnerships', 'Sponsorship', 'Marketing', 'Community Relations', 'CSR'];
+// Priority tiers from the Outreach Guide's "Find the Right Person" table, highest first.
+// Matched as case-insensitive substrings of the contact's job title.
+var SPONSOR_CONTACT_TITLE_TIERS = [
+  ['University Recruit', 'Campus Recruit', 'Early Career', 'Early Talent', 'University Relations', 'University Programs'],
+  ['Employer Brand', 'Recruitment Marketing', 'Talent Acquisition', 'Community Relations', 'Corporate Citizenship', 'Social Impact', 'Corporate Social Responsibility'],
+  ['STEM Outreach', 'Education Partnership', 'Women in Tech', 'Women in Engineering', 'Women\'s Network', 'Women\'s ERG'],
+  ['Brand Partnership', 'Experiential Marketing', 'Community Engagement', 'Sponsorship', 'Partnerships']
+];
+
+// Each enrichment costs an Apollo credit, so cap how many candidates we try per company.
+var MAX_ENRICH_ATTEMPTS_PER_SPONSOR = 2;
 
 function runDailyOutreach() {
   var lock = LockService.getScriptLock();
@@ -38,8 +47,8 @@ function runDailyOutreach() {
           return;
         }
 
-        var draft = draftOutreachEmail(sponsor.sponsorName, contact.firstName || 'there', sponsor.category, sponsor.responsible);
-        sendDraftForReview(reviewerEmail, contact.email, draft.subject, draft.body);
+        var draft = draftOutreachEmail(sponsor.sponsorName, contact.firstName || 'there', sponsor.category, getResponsibleDisplayName_(sponsor.responsible), sponsor.notes);
+        saveDraftForReview(sponsor.responsible, reviewerEmail, contact.email, draft.subject, draft.body);
         markDraftCreated(sponsor.sheetName, sponsor.rowNumber, contact.name, contact.email);
         emailsHandledThisRun[emailKey] = true;
         draftsCreated.push({ sponsorName: sponsor.sponsorName, contactEmail: contact.email });
@@ -49,14 +58,17 @@ function runDailyOutreach() {
     });
 
     var followUpsSent = runFollowUpsInternal_();
-    sendDailyDigest(draftsCreated, followUpsSent);
+    logForDigest_('Outreach', draftsCreated);
+    logForDigest_('Follow-up', followUpsSent);
   } finally {
     lock.releaseLock();
   }
 }
 
 /**
- * Uses the master list's contact if present, otherwise looks one up via Apollo.
+ * Uses the master list's contact if present, otherwise looks one up via Apollo -- but
+ * only once per row. The Notes marker stops the hourly runs from re-spending credits on
+ * a company Apollo already came up empty for.
  */
 function resolveSponsorContact_(sponsor) {
   if (sponsor.contactEmail) {
@@ -67,18 +79,63 @@ function resolveSponsorContact_(sponsor) {
     };
   }
 
+  if (hasApolloSearchMarker_(sponsor.notes)) return null;
+
   var org = apolloFindOrganization(sponsor.sponsorName);
-  if (!org) return null;
+  var contact = org ? findContactAtOrganization_(org.id) : null;
+  appendRowNote_(sponsor.sheetName, sponsor.rowNumber, apolloSearchMarker_(contact));
+  return contact;
+}
 
-  var people = apolloFindPeopleAtOrganization(org.id, SPONSOR_CONTACT_TITLES);
-  if (!people.length) return null;
+var APOLLO_SEARCH_MARKER = 'Apollo contact search';
 
-  var enriched = apolloEnrichPerson(people[0].id);
-  if (!enriched || !enriched.email) return null;
+function apolloSearchMarker_(contact) {
+  return '[' + APOLLO_SEARCH_MARKER + ' ' +
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'M/d/yyyy') + ': ' +
+    (contact ? 'found' : 'none found') + ']';
+}
 
-  return {
-    name: enriched.name,
-    firstName: enriched.first_name,
-    email: enriched.email
-  };
+function hasApolloSearchMarker_(notes) {
+  return String(notes || '').indexOf(APOLLO_SEARCH_MARKER) !== -1;
+}
+
+function findContactAtOrganization_(organizationId) {
+  var allTitles = [].concat.apply([], SPONSOR_CONTACT_TITLE_TIERS);
+  var ranked = rankSponsorContacts_(apolloFindPeopleAtOrganization(organizationId, allTitles));
+
+  for (var i = 0; i < Math.min(ranked.length, MAX_ENRICH_ATTEMPTS_PER_SPONSOR); i++) {
+    var enriched = apolloEnrichPerson(ranked[i].id);
+    if (enriched && enriched.email) {
+      return {
+        name: enriched.name,
+        firstName: enriched.first_name,
+        email: enriched.email
+      };
+    }
+  }
+  return null;
+}
+
+function contactTitleTier_(title) {
+  var t = String(title || '').toLowerCase();
+  for (var i = 0; i < SPONSOR_CONTACT_TITLE_TIERS.length; i++) {
+    var matches = SPONSOR_CONTACT_TITLE_TIERS[i].some(function (keyword) {
+      return t.indexOf(keyword.toLowerCase()) !== -1;
+    });
+    if (matches) return i;
+  }
+  return SPONSOR_CONTACT_TITLE_TIERS.length;
+}
+
+/**
+ * Best guide tier first; within a tier, people Apollo says have an email on file come
+ * first so enrichment credits aren't spent on likely misses. Sort is stable, so Apollo's
+ * own relevance order breaks remaining ties.
+ */
+function rankSponsorContacts_(people) {
+  return people.slice().sort(function (a, b) {
+    var tierDiff = contactTitleTier_(a.title) - contactTitleTier_(b.title);
+    if (tierDiff) return tierDiff;
+    return (b.has_email ? 1 : 0) - (a.has_email ? 1 : 0);
+  });
 }
