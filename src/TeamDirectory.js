@@ -1,20 +1,47 @@
 /**
  * Maps a team member's first name (the master list's "Responsible" column) to their
- * Purdue email. Kept as a plain "Team Emails" tab in the master list spreadsheet so
- * anyone can add, remove, or fix an entry directly in the Sheet -- no code changes.
+ * Purdue email. Lives in the standalone "IH Team Emails" spreadsheet (first tab: Name,
+ * Purdue Email), separate from the master list, so anyone can add, remove, or fix an
+ * entry directly in that Sheet -- no code changes. A TEAM_EMAILS_SPREADSHEET_ID Script
+ * Property overrides the default ID below.
  */
 
-var TEAM_DIRECTORY_SHEET_NAME = 'Team Emails';
+var TEAM_EMAILS_SPREADSHEET_DEFAULT_ID = '1cLyXCvLzKc3ydKgvqNKYcqtf7vDvapM1YTjYTwYbenM';
+var LEGACY_TEAM_EMAILS_TAB_NAME = 'Team Emails';
 
+/**
+ * Returns the directory tab. While it has no people yet, copies them over from the
+ * master list's old "Team Emails" tab (adding the header row if that's missing too).
+ */
 function ensureTeamDirectorySheet_() {
-  var ss = SpreadsheetApp.openById(getMasterListSpreadsheetId_());
-  var sheet = ss.getSheetByName(TEAM_DIRECTORY_SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.insertSheet(TEAM_DIRECTORY_SHEET_NAME);
+  var id = SCRIPT_PROPS.getProperty('TEAM_EMAILS_SPREADSHEET_ID') || TEAM_EMAILS_SPREADSHEET_DEFAULT_ID;
+  var sheet = SpreadsheetApp.openById(id).getSheets()[0];
+  if (sheet.getLastRow() >= 2) return sheet;
+
+  if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, 2).setValues([['Name', 'Purdue Email']]);
     sheet.setFrozenRows(1);
   }
+
+  var oldTab = SpreadsheetApp.openById(getMasterListSpreadsheetId_()).getSheetByName(LEGACY_TEAM_EMAILS_TAB_NAME);
+  if (oldTab && oldTab.getLastRow() >= 2) {
+    var people = oldTab.getRange(2, 1, oldTab.getLastRow() - 1, 2).getValues();
+    sheet.getRange(2, 1, people.length, 2).setValues(people);
+    Logger.log('Copied ' + people.length + ' people into the Team Emails sheet from the master list tab.');
+  }
   return sheet;
+}
+
+/** Menu/editor entry point: logs (and in the Sheet, shows) the Team Emails sheet link. */
+function openTeamEmailsSheet() {
+  var sheet = ensureTeamDirectorySheet_();
+  var url = sheet.getParent().getUrl();
+  Logger.log('Team Emails sheet: ' + url);
+  try {
+    SpreadsheetApp.getUi().alert('Team Emails sheet:\n' + url);
+  } catch (err) {
+    // No UI when run from the editor; the log line above has the link.
+  }
 }
 
 var teamDirectoryCache_ = null;

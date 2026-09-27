@@ -21,7 +21,7 @@ that automates sponsor outreach for the InnovateHer hackathon finance team.
 | Outreach guide + email template | Google Docs (Drive) |
 | Sponsor/contact discovery | Apollo.io API |
 | Draft delivery | Emailed to the sponsor row's Responsible person's Outlook inbox via `MailApp`, labeled `[DRAFT]` (see note below) |
-| Name → Outlook email lookup | "Team Emails" tab in the master list spreadsheet (add/remove people directly in the Sheet, no code changes) |
+| Name → Outlook email lookup | Standalone "IH Team Emails" spreadsheet, first tab with Name / Purdue Email columns (add/remove people directly in that Sheet, no code changes). A `TEAM_EMAILS_SPREADSHEET_ID` Script Property overrides the default sheet ID in `src/TeamDirectory.js` |
 | Daily digest | Sent via the Apps Script account's Gmail (`MailApp`) to whatever address you configure — works regardless of the recipient's mail provider |
 | Scheduling | Apps Script time-driven triggers |
 | Duplicate prevention | A contact email already logged (non-blank Status or Last Contact) anywhere in the master list is skipped; a `LockService` script lock also stops overlapping runs (e.g. a manual run colliding with the daily trigger) from double-drafting |
@@ -45,7 +45,7 @@ Installed via the Sheet menu **Sponsorship Outreach → Install triggers** (`ins
 | Trigger | When | What it does |
 |---|---|---|
 | `runDailyProspecting` | Daily, ~7am | Finds new companies via Apollo (see budget below), looks up one contact per company once, appends them with a blank Responsible |
-| `runScheduledOutreach` | Hourly, 8am–midnight | Drafts outreach for rows whose Responsible is in the Team Emails tab |
+| `runScheduledOutreach` | Hourly, 8am–midnight | Drafts outreach for rows whose Responsible is in the IH Team Emails sheet |
 | `sendScheduledDigest` | Daily, ~3pm | Emails drafts, follow-ups, and new prospects logged since the previous 3pm digest |
 
 ## Apollo credit budget
@@ -76,7 +76,7 @@ Scaffolding only right now. Still open:
 - [x] Bind this project to a real Apps Script deployment (`clasp create` via the Sheet's Extensions menu) and fill in `.clasp.json`
 - [ ] Apollo.io API key, scoped to `mixed_companies/search`, `mixed_people/api_search`, `people/match` (created — add to Script Properties, not code)
 - [ ] Set `DIGEST_RECIPIENT_EMAIL` Script Property (comma-separate multiple addresses)
-- [ ] Fill in the "Team Emails" tab (Name, Purdue Email) for each Responsible person — use the Sheet's menu: **Sponsorship Outreach → Set up / open Team Emails sheet**
+- [ ] Fill in the "IH Team Emails" sheet (Name, Purdue Email) for each Responsible person — the Sheet menu **Sponsorship Outreach → Team Emails sheet (show link)** shows where it is
 - [ ] Each category's email is still filled from one generic template (`src/Templates.js`) rather than the 5 distinct category templates in the outreach guide doc — not yet split out
 - [x] Apollo contact-title search ranks results by the guide's priority tiers (University Recruiter first, etc.)
 
@@ -92,5 +92,5 @@ npx clasp push
 Secrets and per-deployment config (Apollo API key, digest recipient) are never
 committed to this repo — set them in the Apps Script editor under
 **Project Settings → Script Properties** instead. Per-person draft routing
-(Name → Purdue email) lives in the "Team Emails" sheet tab, not Script Properties,
+(Name → Purdue email) lives in the standalone "IH Team Emails" sheet, not Script Properties,
 so it's easy for anyone on the team to edit directly.
