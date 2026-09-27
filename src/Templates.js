@@ -10,6 +10,14 @@
 var STANDARD_OUTREACH_OPENER = 'My name is [Your Name], and I’m part of the team organizing InnovateHer at Purdue University. ' +
   'I’m reaching out to introduce an opportunity for [COMPANY NAME] to engage with a highly motivated and underrepresented student talent pool.';
 
+// Replaces every category template's own subject line, so all outreach drafts use the
+// same subject regardless of what the template Doc says.
+var STANDARD_OUTREACH_SUBJECT = 'Strategic Partnership Opportunity with Purdue’s Leading Women-Centric Hackathon';
+
+// Replaces the follow-up template's own subject line, so all follow-up drafts use the
+// same subject regardless of what the template Doc says.
+var STANDARD_FOLLOW_UP_SUBJECT = 'Follow-Up: InnovateHer 2027 Sponsorship Opportunity';
+
 function getEmailTemplateFullText_() {
   var doc = DocumentApp.openById(getEmailTemplateDocId_());
   return doc.getBody().getText();
@@ -107,7 +115,7 @@ function draftOutreachEmail(sponsorName, contactFirstName, category, senderName,
   var personalization = generateBrandPersonalization_(sponsorName, category, notes, getIntroParagraph_(body));
 
   return {
-    subject: fillPlaceholders_(split.subject, fields) || ('Partnership opportunity with InnovateHer'),
+    subject: STANDARD_OUTREACH_SUBJECT,
     body: addParagraphSpacing_(insertPersonalization_(body, personalization))
   };
 }
@@ -123,7 +131,7 @@ function draftFollowUpEmail(sponsorName, contactFirstName, senderName) {
   var fields = { sponsorName: sponsorName, contactFirstName: contactFirstName, senderName: senderName };
 
   return {
-    subject: fillPlaceholders_(split.subject, fields) || 'Following up: partnership opportunity with InnovateHer',
+    subject: STANDARD_FOLLOW_UP_SUBJECT,
     body: addParagraphSpacing_(fillPlaceholders_(split.body, fields))
   };
 }

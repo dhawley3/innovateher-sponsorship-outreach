@@ -45,8 +45,16 @@ function runDailyProspecting() {
 
   try {
     var now = new Date();
+    var dailyTarget = dailyProspectTarget_(now);
+
+    // Prioritize finding emails for sponsors already on the list before spending any of
+    // today's Apollo budget discovering brand-new companies.
+    var emailsFilled = fillMissingSponsorEmails_(dailyTarget);
+    logForDigest_('Email Found', emailsFilled.updated);
+
     var categories = Object.keys(CATEGORY_DISCOVERY_CRITERIA);
-    var quotas = prospectQuotas_(categories, dailyProspectTarget_(now), now);
+    var remainingTarget = Math.max(0, dailyTarget - emailsFilled.attempted);
+    var quotas = prospectQuotas_(categories, remainingTarget, now);
     var added = [];
 
     categories.forEach(function (category, i) {
@@ -79,7 +87,23 @@ function getExistingCompanyNames_(sheetName) {
   return names;
 }
 
-function appendProspectRow_(sheetName, companyName, contact) {
+/**
+ * Company names across every category tab, not just one -- Gemini can place a discovered
+ * company in a different category than the one it was found under (e.g. a Local Businesses
+ * find that turns out to be Women-Owned), so a single-tab check isn't enough to stop it
+ * from being re-added under a different tab on a later run.
+ */
+function getExistingCompanyNamesAcrossAllCategories_() {
+  var names = {};
+  CATEGORY_SHEET_NAMES.forEach(function (sheetName) {
+    Object.keys(getExistingCompanyNames_(sheetName)).forEach(function (name) {
+      names[name] = true;
+    });
+  });
+  return names;
+}
+
+function appendProspectRow_(sheetName, companyName, contact, evaluationReason) {
   var ss = SpreadsheetApp.openById(getMasterListSpreadsheetId_());
   var sheet = ss.getSheetByName(sheetName);
   var lastColumn = sheet.getLastColumn();
@@ -87,13 +111,11 @@ function appendProspectRow_(sheetName, companyName, contact) {
   var row = new Array(lastColumn).fill('');
 
   row[headerIndex_(header, 'Company Name')] = companyName;
-  if (contact) {
-    row[headerIndex_(header, 'Point of Contact')] = contact.name || '';
-    row[headerIndex_(header, 'Email')] = contact.email;
-  }
+  row[headerIndex_(header, 'Point of Contact')] = contact.name || '';
+  row[headerIndex_(header, 'Email')] = contact.email;
   row[headerIndex_(header, 'Notes')] = 'Auto-discovered via Apollo on ' +
     Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'M/d/yyyy') +
-    ' -- verify fit before contacting. ' + apolloSearchMarker_(contact);
+    ' -- vetted by Gemini: ' + (evaluationReason || '(no reason given)') + '. ' + apolloSearchMarker_(contact);
 
   sheet.appendRow(row);
 }
@@ -107,9 +129,12 @@ function discoveryPageKey_(category) {
 }
 
 /**
- * Pulls candidate companies from Apollo for `category`, skips anything already in that
- * tab (case-insensitive name match), and appends up to `maxResults` new rows, each with a
- * one-time contact lookup. Returns [{ sponsorName, contactEmail }] for the rows added.
+ * Pulls candidate companies from Apollo for `category`, skips anything already in any
+ * category tab (case-insensitive name match), requires a real contact email, and requires
+ * Gemini to sign off that the company is a plausible sponsor before it's written anywhere --
+ * Gemini also has the final say on which category tab it actually belongs in (Apollo's
+ * criteria are just a rough net). Appends up to `maxResults` new rows.
+ * Returns [{ sponsorName, contactEmail, category }] for the rows added.
  */
 function discoverNewProspects(category, maxResults) {
   maxResults = maxResults || 10;
@@ -120,7 +145,7 @@ function discoverNewProspects(category, maxResults) {
 
   var pageKey = discoveryPageKey_(category);
   var page = Number(SCRIPT_PROPS.getProperty(pageKey)) || 1;
-  var existing = getExistingCompanyNames_(category);
+  var existing = getExistingCompanyNamesAcrossAllCategories_();
   var added = [];
 
   for (var pagesRead = 0; added.length < maxResults && pagesRead < MAX_DISCOVERY_PAGES_PER_RUN; pagesRead++) {
@@ -143,9 +168,20 @@ function discoverNewProspects(category, maxResults) {
         Logger.log('Contact lookup failed for ' + name + ': ' + err.message);
       }
 
-      appendProspectRow_(category, name, contact);
+      if (!contact || !contact.email) {
+        Logger.log('Skipping ' + name + ' -- no contact email found.');
+        continue;
+      }
+
+      var evaluation = evaluateSponsorProspect_(name, category);
+      if (!evaluation.isGoodFit) {
+        Logger.log('Skipping ' + name + ' -- Gemini flagged as not a good sponsor fit: ' + evaluation.reason);
+        continue;
+      }
+
+      appendProspectRow_(evaluation.category, name, contact, evaluation.reason);
       existing[name.toLowerCase()] = true;
-      added.push({ sponsorName: name, contactEmail: contact ? contact.email : '(no contact found)' });
+      added.push({ sponsorName: name, contactEmail: contact.email, category: evaluation.category });
     }
 
     // Only advance past a page once every company on it has been considered.
@@ -153,8 +189,8 @@ function discoverNewProspects(category, maxResults) {
   }
 
   SCRIPT_PROPS.setProperty(pageKey, String(page));
-  Logger.log('Added ' + added.length + ' new ' + category + ' prospect(s): ' +
-    added.map(function (a) { return a.sponsorName + ' <' + a.contactEmail + '>'; }).join(', '));
+  Logger.log('Added ' + added.length + ' new prospect(s) from ' + category + ' discovery: ' +
+    added.map(function (a) { return a.sponsorName + ' <' + a.contactEmail + '> [' + a.category + ']'; }).join(', '));
   return added;
 }
 

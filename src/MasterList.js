@@ -140,6 +140,46 @@ function getSponsorsAwaitingResponse(minDaysAgo) {
 }
 
 /**
+ * Rows across every category tab that have a company name but no email yet, skipping any
+ * row Apollo already searched (see hasApolloSearchMarker_ in OutreachWorkflow.js) so a
+ * permanent miss isn't retried indefinitely. Used to prioritize finding emails for sponsors
+ * already on the list ahead of spending Apollo credits discovering brand-new companies.
+ */
+function getSponsorsMissingEmail_() {
+  var results = [];
+
+  getCategorySheets_().forEach(function (entry) {
+    var values = entry.sheet.getDataRange().getValues();
+    var header = values[0];
+    var nameCol = headerIndex_(header, 'Company Name');
+    var emailCol = headerIndex_(header, 'Email');
+    var notesCol = headerIndex_(header, 'Notes');
+
+    for (var i = 1; i < values.length; i++) {
+      var row = values[i];
+      var name = String(row[nameCol] || '').trim();
+      var email = String(row[emailCol] || '').trim();
+      var notes = String(row[notesCol] || '').trim();
+
+      if (name && !email && !hasApolloSearchMarker_(notes)) {
+        results.push({ sheetName: entry.name, rowNumber: i + 1, sponsorName: name, notes: notes });
+      }
+    }
+  });
+
+  return results;
+}
+
+function setSponsorContact_(sheetName, rowNumber, contact) {
+  var ss = SpreadsheetApp.openById(getMasterListSpreadsheetId_());
+  var sheet = ss.getSheetByName(sheetName);
+  var header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+  sheet.getRange(rowNumber, headerIndex_(header, 'Point of Contact') + 1).setValue(contact.name || '');
+  sheet.getRange(rowNumber, headerIndex_(header, 'Email') + 1).setValue(contact.email);
+}
+
+/**
  * Records that a draft went out for review -- never "Contacted". Only a human marking
  * the sheet themselves after actually reviewing and sending should set Status to
  * "Contacted" or fill in Last Contact; the script only ever sets "Drafted", which also

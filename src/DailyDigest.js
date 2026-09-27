@@ -45,12 +45,12 @@ function sendScheduledDigest() {
     var lastRow = sheet.getLastRow();
     var rows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, 4).getValues() : [];
 
-    var buckets = { 'Outreach': [], 'Follow-up': [], 'Prospect': [] };
+    var buckets = { 'Outreach': [], 'Follow-up': [], 'Prospect': [], 'Email Found': [] };
     rows.forEach(function (row) {
       (buckets[row[1]] || buckets['Outreach']).push({ sponsorName: row[2], contactEmail: row[3] });
     });
 
-    sendDailyDigest(buckets['Outreach'], buckets['Follow-up'], buckets['Prospect']);
+    sendDailyDigest(buckets['Outreach'], buckets['Follow-up'], buckets['Prospect'], buckets['Email Found']);
 
     if (rows.length) sheet.deleteRows(2, rows.length);
   } finally {
@@ -58,7 +58,7 @@ function sendScheduledDigest() {
   }
 }
 
-function sendDailyDigest(draftsCreated, followUpsSent, prospectsAdded) {
+function sendDailyDigest(draftsCreated, followUpsSent, prospectsAdded, emailsFound) {
   var recipients = getDigestRecipient_()
     .split(',')
     .map(function (email) { return email.trim(); })
@@ -77,6 +77,12 @@ function sendDailyDigest(draftsCreated, followUpsSent, prospectsAdded) {
   lines.push('Follow-up drafts: ' + followUpsSent.length);
   followUpsSent.forEach(function (f) {
     lines.push('  - ' + f.sponsorName + ' -> ' + f.contactEmail);
+  });
+
+  lines.push('');
+  lines.push('Emails found for existing sponsors: ' + (emailsFound || []).length);
+  (emailsFound || []).forEach(function (e) {
+    lines.push('  - ' + e.sponsorName + ' -> ' + e.contactEmail);
   });
 
   lines.push('');

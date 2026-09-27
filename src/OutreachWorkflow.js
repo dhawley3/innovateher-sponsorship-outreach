@@ -87,6 +87,41 @@ function resolveSponsorContact_(sponsor) {
   return contact;
 }
 
+/**
+ * Looks up an email for sponsors already on the list that don't have one yet, up to
+ * `maxLookups` companies (each Apollo search that came up empty is still marked so it
+ * isn't retried indefinitely). Called before new-prospect discovery so Apollo credits go
+ * to filling gaps in the existing list first. Returns { updated, attempted } -- `attempted`
+ * (not just `updated`) is what should count against the day's Apollo credit budget, since
+ * a miss still costs the search.
+ */
+function fillMissingSponsorEmails_(maxLookups) {
+  var rows = getSponsorsMissingEmail_();
+  var updated = [];
+  var attempted = 0;
+
+  for (var i = 0; i < rows.length && attempted < maxLookups; i++) {
+    var row = rows[i];
+    attempted++;
+    try {
+      var org = apolloFindOrganization(row.sponsorName);
+      var contact = org ? findContactAtOrganization_(org.id) : null;
+      appendRowNote_(row.sheetName, row.rowNumber, apolloSearchMarker_(contact));
+
+      if (contact) {
+        setSponsorContact_(row.sheetName, row.rowNumber, contact);
+        updated.push({ sponsorName: row.sponsorName, contactEmail: contact.email });
+      }
+    } catch (err) {
+      Logger.log('Email lookup failed for ' + row.sponsorName + ': ' + err.message);
+    }
+  }
+
+  Logger.log('Found ' + updated.length + ' of ' + attempted + ' missing sponsor email(s) attempted: ' +
+    updated.map(function (u) { return u.sponsorName + ' <' + u.contactEmail + '>'; }).join(', '));
+  return { updated: updated, attempted: attempted };
+}
+
 var APOLLO_SEARCH_MARKER = 'Apollo contact search';
 
 function apolloSearchMarker_(contact) {
