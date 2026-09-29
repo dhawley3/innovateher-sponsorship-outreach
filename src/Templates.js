@@ -28,6 +28,20 @@ function getOutreachGuideText_() {
   return doc.getBody().getText();
 }
 
+var outreachGuideTextCache_ = null;
+
+/**
+ * Cached for the lifetime of a single execution -- discoverNewProspects calls this once
+ * per candidate company (potentially dozens per run), and re-reading the Doc that often
+ * would be wasteful and slow.
+ */
+function getOutreachGuideTextCached_() {
+  if (outreachGuideTextCache_ === null) {
+    outreachGuideTextCache_ = getOutreachGuideText_();
+  }
+  return outreachGuideTextCache_;
+}
+
 /**
  * Slices out just the text between `heading` and whichever known heading comes next,
  * so a category's draft only ever contains that category's own template.

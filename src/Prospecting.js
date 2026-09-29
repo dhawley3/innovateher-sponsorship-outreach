@@ -128,6 +128,37 @@ function discoveryPageKey_(category) {
   return 'PROSPECT_NEXT_PAGE_' + category.toUpperCase().replace(/[^A-Z]+/g, '_');
 }
 
+// Companies here get evaluated (and, on a good-fit result, added) before anything else on
+// the same page -- a soft priority, not a filter, so a great-fit company from anywhere in
+// the US still gets added once nearby candidates are exhausted for the day.
+var PROSPECT_PRIORITY_STATES = ['indiana'];
+var PROSPECT_PRIORITY_CITIES = ['chicago', 'indianapolis'];
+var PROSPECT_PRIORITY_NEARBY_STATES = ['illinois', 'ohio', 'michigan', 'kentucky'];
+
+/**
+ * Lower score = evaluated first. Indiana itself ranks highest (covers Indianapolis too),
+ * then explicitly-named nearby major cities, then neighboring states, then everywhere else.
+ */
+function prospectProximityScore_(org) {
+  var state = String(org.state || '').trim().toLowerCase();
+  var city = String(org.city || '').trim().toLowerCase();
+
+  if (PROSPECT_PRIORITY_STATES.indexOf(state) !== -1) return 0;
+  if (PROSPECT_PRIORITY_CITIES.indexOf(city) !== -1) return 1;
+  if (PROSPECT_PRIORITY_NEARBY_STATES.indexOf(state) !== -1) return 2;
+  return 3;
+}
+
+/**
+ * Stable sort (native Array#sort in the V8 runtime Apps Script now uses) so ties keep
+ * Apollo's own relevance order within a proximity tier.
+ */
+function sortByProspectProximity_(orgs) {
+  return orgs.slice().sort(function (a, b) {
+    return prospectProximityScore_(a) - prospectProximityScore_(b);
+  });
+}
+
 /**
  * Pulls candidate companies from Apollo for `category`, skips anything already in any
  * category tab (case-insensitive name match), requires a real contact email, and requires
@@ -156,6 +187,7 @@ function discoverNewProspects(category, maxResults) {
       page = 1;
       break;
     }
+    orgs = sortByProspectProximity_(orgs);
 
     for (var i = 0; i < orgs.length && added.length < maxResults; i++) {
       var name = String(orgs[i].name || '').trim();

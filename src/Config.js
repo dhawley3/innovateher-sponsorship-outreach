@@ -72,7 +72,11 @@ var CATEGORY_DISCOVERY_CRITERIA = {
     organization_num_employees_ranges: ['1,50']
   },
   'In-Kind Sponsors': {
-    q_organization_keyword_tags: ['consumer products', 'cosmetics', 'beverage', 'apparel', 'accessories']
+    q_organization_keyword_tags: ['consumer products', 'cosmetics', 'beverage', 'apparel', 'accessories'],
+    // Not restricted to Indiana like Local Businesses -- searches the whole US, but
+    // discoverNewProspects sorts results so Indiana/Chicago/Indianapolis-area companies
+    // are evaluated first (see prospectProximityScore_ in src/Prospecting.js).
+    organization_locations: ['united states']
   }
 };
 

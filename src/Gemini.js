@@ -8,6 +8,8 @@ var GEMINI_DEFAULT_MODEL = 'gemini-flash-latest';
 var GEMINI_MAX_PERSONALIZATION_CHARS = 450;
 var GEMINI_PROSPECT_EVAL_MAX_ATTEMPTS = 3;
 var GEMINI_PROSPECT_EVAL_RETRY_DELAY_MS = 10 * 60 * 1000;
+// Keeps the prompt (and Gemini's free-tier token usage) bounded if the guide Doc is long.
+var GEMINI_MAX_GUIDE_CHARS_IN_PROMPT = 6000;
 
 // Categories Gemini is allowed to place a newly discovered prospect into. Excludes "Warm
 // Contacts" -- that tab is for people the team already knows, never a cold Apollo find.
@@ -35,10 +37,12 @@ function evaluateSponsorProspect_(companyName, discoveryCategory) {
     throw new Error('GEMINI_API_KEY not set -- required to vet new sponsor prospects before adding them.');
   }
 
+  var guideExcerpt = getOutreachGuideTextCached_().slice(0, GEMINI_MAX_GUIDE_CHARS_IN_PROMPT);
+
   var lastError;
   for (var attempt = 1; attempt <= GEMINI_PROSPECT_EVAL_MAX_ATTEMPTS; attempt++) {
     try {
-      return requestSponsorEvaluation_(apiKey, companyName, discoveryCategory);
+      return requestSponsorEvaluation_(apiKey, companyName, discoveryCategory, guideExcerpt);
     } catch (err) {
       lastError = err;
       Logger.log('Gemini prospect evaluation attempt ' + attempt + '/' + GEMINI_PROSPECT_EVAL_MAX_ATTEMPTS +
@@ -54,11 +58,16 @@ function evaluateSponsorProspect_(companyName, discoveryCategory) {
     GEMINI_PROSPECT_EVAL_MAX_ATTEMPTS + ' attempts: ' + lastError.message);
 }
 
-function requestSponsorEvaluation_(apiKey, companyName, discoveryCategory) {
+function requestSponsorEvaluation_(apiKey, companyName, discoveryCategory, guideExcerpt) {
   var model = SCRIPT_PROPS.getProperty('GEMINI_MODEL') || GEMINI_DEFAULT_MODEL;
   var prompt = [
     'You are helping a student team vet potential sponsor companies for InnovateHer, a 24-hour hackathon',
-    'at Purdue University for women and gender minorities in tech.',
+    'at Purdue University for women and gender minorities in tech. Use the sponsorship outreach guide',
+    'below as the source of truth for what a good sponsor looks like and how sponsors should be found.',
+    '',
+    '--- Outreach guide (may be truncated) ---',
+    guideExcerpt,
+    '--- End outreach guide ---',
     '',
     'Company: ' + companyName,
     'Category it was found under: ' + discoveryCategory,
@@ -67,7 +76,9 @@ function requestSponsorEvaluation_(apiKey, companyName, discoveryCategory) {
     '1. Would this company plausibly be a good fit to ask for hackathon sponsorship (cash, product, or ' +
       'in-kind)? Reject it if it is clearly the wrong size or type for student-event sponsorship -- e.g. a ' +
       'huge multinational with no history of local/community sponsorship, a company in an unrelated or ' +
-      'inappropriate industry, or a name that does not look like a real, identifiable business.',
+      'inappropriate industry, or a name that does not look like a real, identifiable business. Also reject ' +
+      'it if it is not headquartered in the United States and does not have a major U.S. branch or office -- ' +
+      'this hackathon only sponsors companies with a real U.S. presence.',
     '2. Which single category it actually belongs in, from exactly this list: ' +
       PROSPECT_CATEGORIES_FOR_CLASSIFICATION.join(', ') + '.',
     '   Use "Women-Owned" if the company is women-owned or women-led, regardless of which category it was',
@@ -75,8 +86,8 @@ function requestSponsorEvaluation_(apiKey, companyName, discoveryCategory) {
     '   large company that could give a cash sponsorship, "In-Kind Sponsors" for a consumer product/brand',
     '   likely to donate product instead of cash, "Local Businesses" for a small local company.',
     '',
-    'Only use facts you are confident about. If you do not recognize the company at all, treat that as a',
-    'reason to be cautious rather than guessing.',
+    'Only use facts you are confident about. If you do not recognize the company at all, or cannot confirm',
+    'it has a real U.S. presence, treat that as a reason to be cautious rather than guessing.',
     '',
     'Respond with ONLY a JSON object, no markdown or code fences, in exactly this shape:',
     '{"isGoodFit": true, "category": "one of the categories above", "reason": "one short sentence"}'
