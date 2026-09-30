@@ -55,9 +55,11 @@ function getAlreadyContactedEmails_() {
 }
 
 /**
- * Returns rows (by category tab + row number) for sponsors not yet drafted or contacted:
- * blank status or "Brainstormed", and not already drafted/contacted elsewhere under a
- * different row/tab.
+ * Returns rows (by category tab + row number) for sponsors the team has actually reviewed
+ * and marked "Brainstormed" -- NOT blank status. Blank means nobody has vetted this row yet
+ * (e.g. a company Apollo just discovered), so it must not get auto-drafted just because a
+ * name later shows up in Responsible; a human has to mark it Brainstormed first. Also
+ * excludes anyone already drafted/contacted elsewhere under a different row/tab.
  */
 function getUncontactedSponsors() {
   var alreadyContacted = getAlreadyContactedEmails_();
@@ -77,7 +79,7 @@ function getUncontactedSponsors() {
       var status = row[statusCol];
       var email = String(row[emailCol] || '').trim();
 
-      if ((status === '' || status === 'Brainstormed') &&
+      if (status === 'Brainstormed' &&
           !(email && alreadyContacted[email.toLowerCase()])) {
         results.push({
           sheetName: entry.name,
