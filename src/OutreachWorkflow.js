@@ -15,6 +15,13 @@ var SPONSOR_CONTACT_TITLE_TIERS = [
 // Each enrichment costs an Apollo credit, so cap how many candidates we try per company.
 var MAX_ENRICH_ATTEMPTS_PER_SPONSOR = 2;
 
+// Per reviewer (the email address drafts actually go to), not a total across the whole
+// run -- keeps each person's batch small enough that Gemini personalization stays within
+// its per-minute rate limit instead of silently falling back to the plain template partway
+// through. A sponsor skipped for being over the cap is left uncontacted and picked up by a
+// later run, same as anyone skipped for any other reason below.
+var MAX_DRAFTS_PER_REVIEWER_PER_RUN = 8;
+
 function runDailyOutreach() {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(5000)) {
@@ -26,12 +33,20 @@ function runDailyOutreach() {
     var sponsors = getUncontactedSponsors();
     var draftsCreated = [];
     var emailsHandledThisRun = {};
+    var draftCountByReviewer = {};
 
     sponsors.forEach(function (sponsor) {
       try {
         var reviewerEmail = getResponsibleEmail_(sponsor.responsible);
         if (!reviewerEmail) {
           Logger.log('No Purdue email on file for "' + sponsor.responsible + '" (add them to the Team Emails sheet), skipping ' + sponsor.sponsorName);
+          return;
+        }
+
+        var reviewerKey = reviewerEmail.toLowerCase();
+        if ((draftCountByReviewer[reviewerKey] || 0) >= MAX_DRAFTS_PER_REVIEWER_PER_RUN) {
+          Logger.log(reviewerEmail + ' already hit the ' + MAX_DRAFTS_PER_REVIEWER_PER_RUN +
+            '-draft cap for this run, skipping ' + sponsor.sponsorName + ' until next run.');
           return;
         }
 
@@ -51,6 +66,7 @@ function runDailyOutreach() {
         saveDraftForReview(sponsor.responsible, reviewerEmail, contact.email, draft.subject, draft.body);
         markDraftCreated(sponsor.sheetName, sponsor.rowNumber, contact.name, contact.email);
         emailsHandledThisRun[emailKey] = true;
+        draftCountByReviewer[reviewerKey] = (draftCountByReviewer[reviewerKey] || 0) + 1;
         draftsCreated.push({ sponsorName: sponsor.sponsorName, contactEmail: contact.email });
       } catch (err) {
         Logger.log('Failed to process ' + sponsor.sponsorName + ': ' + err.message);
