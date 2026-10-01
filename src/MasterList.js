@@ -99,8 +99,10 @@ function getUncontactedSponsors() {
 }
 
 /**
- * Returns rows for sponsors marked Contacted with no recorded follow-up yet,
- * whose Last Contact date is at least `minDaysAgo` days in the past.
+ * Returns rows for sponsors marked Contacted with a contact email still on file and no
+ * recorded follow-up yet, whose Last Contact date is at least `minDaysAgo` days in the past
+ * but no older than FOLLOW_UP_MIN_CONTACT_DATE (src/FollowUpWorkflow.js) -- that floor keeps
+ * stale/test "Contacted" rows with old dates from ever qualifying.
  */
 function getSponsorsAwaitingResponse(minDaysAgo) {
   var cutoff = new Date();
@@ -120,17 +122,19 @@ function getSponsorsAwaitingResponse(minDaysAgo) {
     for (var i = 1; i < values.length; i++) {
       var row = values[i];
       var status = row[statusCol];
+      var email = String(row[emailCol] || '').trim();
       var dateContacted = row[lastContactCol];
       var followUpSent = row[followUpCol];
 
-      if (status === 'Contacted' && dateContacted && !followUpSent && new Date(dateContacted) <= cutoff) {
+      if (status === 'Contacted' && email && dateContacted && !followUpSent &&
+          new Date(dateContacted) >= FOLLOW_UP_MIN_CONTACT_DATE && new Date(dateContacted) <= cutoff) {
         results.push({
           sheetName: entry.name,
           rowNumber: i + 1,
           category: entry.name,
           sponsorName: row[0],
           contactName: row[pocCol],
-          contactEmail: row[emailCol],
+          contactEmail: email,
           responsible: row[responsibleCol],
           dateContacted: dateContacted
         });

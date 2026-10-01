@@ -4,6 +4,12 @@
 
 var FOLLOW_UP_WAIT_DAYS = 7;
 
+// Safety floor: a Last Contact date before this predates this guard (added after stale/test
+// "Contacted" rows with old dates caused a mass follow-up send -- see getSponsorsAwaitingResponse
+// in src/MasterList.js) and is permanently excluded, no matter how old it is. Only sponsors
+// actually contacted on or after this date are eligible for the normal FOLLOW_UP_WAIT_DAYS wait.
+var FOLLOW_UP_MIN_CONTACT_DATE = new Date('2026-10-01');
+
 /**
  * Menu-facing entry point -- acquires its own lock, since it can run independently
  * of runDailyOutreach (which already holds the lock when it calls runFollowUpsInternal_ directly).
