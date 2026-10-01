@@ -26,12 +26,23 @@ function runFollowUpsInternal_() {
   var pending = getSponsorsAwaitingResponse(FOLLOW_UP_WAIT_DAYS);
   var followUpsSent = [];
   var emailsHandledThisRun = {};
+  var draftCountByReviewer = {};
 
   pending.forEach(function (sponsor) {
     try {
       var reviewerEmail = getResponsibleEmail_(sponsor.responsible);
       if (!reviewerEmail) {
         Logger.log('No Purdue email on file for "' + sponsor.responsible + '" (add them to the Team Emails sheet), skipping follow-up for ' + sponsor.sponsorName);
+        return;
+      }
+
+      // Same per-reviewer cap as the initial outreach drafts (MAX_DRAFTS_PER_REVIEWER_PER_RUN,
+      // src/OutreachWorkflow.js) -- without it, a large backlog of overdue follow-ups for one
+      // person all go out in a single run with no rate limiting at all.
+      var reviewerKey = reviewerEmail.toLowerCase();
+      if ((draftCountByReviewer[reviewerKey] || 0) >= MAX_DRAFTS_PER_REVIEWER_PER_RUN) {
+        Logger.log(reviewerEmail + ' already hit the ' + MAX_DRAFTS_PER_REVIEWER_PER_RUN +
+          '-draft cap for this run, skipping follow-up for ' + sponsor.sponsorName + ' until next run.');
         return;
       }
 
@@ -46,6 +57,7 @@ function runFollowUpsInternal_() {
       saveDraftForReview(sponsor.responsible, reviewerEmail, sponsor.contactEmail, draft.subject, draft.body);
       markFollowUpSent(sponsor.sheetName, sponsor.rowNumber);
       if (emailKey) emailsHandledThisRun[emailKey] = true;
+      draftCountByReviewer[reviewerKey] = (draftCountByReviewer[reviewerKey] || 0) + 1;
       followUpsSent.push({ sponsorName: sponsor.sponsorName, contactEmail: sponsor.contactEmail });
     } catch (err) {
       Logger.log('Failed to draft follow-up for ' + sponsor.sponsorName + ': ' + err.message);
