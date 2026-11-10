@@ -44,7 +44,7 @@ Installed via the Sheet menu **Sponsorship Outreach → Install triggers** (`ins
 
 | Trigger | When | What it does |
 |---|---|---|
-| `runDailyProspecting` | Daily, ~7am | Finds new companies via Apollo (see budget below), looks up one contact per company once, appends them with a blank Responsible |
+| `runDailyProspecting` | Daily, ~7am, 11am, 3pm, 7pm | Fills missing emails on claimed rows, then finds new companies via Apollo — the daily target (17 companies, ~30 credits, from the Oct 26 cycle) is split across the 4 runs, looks up one contact per company once, appends them with a blank Responsible |
 | `runScheduledOutreach` | Hourly, 8am–midnight | Drafts outreach for rows whose Responsible is in the IH Team Emails sheet |
 | `sendScheduledDigest` | Daily, ~3pm | Emails drafts, follow-ups, and new prospects logged since the previous 3pm digest |
 

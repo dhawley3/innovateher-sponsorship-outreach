@@ -1,10 +1,12 @@
 var OUTREACH_WINDOW_START_HOUR = 8;
 var DIGEST_HOUR = 15;
-var PROSPECTING_HOUR = 7;
+// Apollo prospecting runs per day; the daily company target is split across them
+// (see prospectRunTarget_ in src/Prospecting.js).
+var PROSPECTING_HOURS = [7, 11, 15, 19];
 
 /**
- * Replaces any existing triggers with a daily 7am prospect discovery, an hourly outreach
- * run, and a daily 3pm digest.
+ * Replaces any existing triggers with prospect discovery at each of PROSPECTING_HOURS,
+ * an hourly outreach run, and a daily 3pm digest.
  * Apps Script can't limit a time-based trigger to certain hours, so runScheduledOutreach
  * checks the window itself.
  */
@@ -13,12 +15,14 @@ function installTriggers() {
     ScriptTriggers_(name).forEach(function (t) { ScriptApp.deleteTrigger(t); });
   });
 
-  ScriptApp.newTrigger('runDailyProspecting')
-    .timeBased()
-    .everyDays(1)
-    .atHour(PROSPECTING_HOUR)
-    .nearMinute(0)
-    .create();
+  PROSPECTING_HOURS.forEach(function (hour) {
+    ScriptApp.newTrigger('runDailyProspecting')
+      .timeBased()
+      .everyDays(1)
+      .atHour(hour)
+      .nearMinute(0)
+      .create();
+  });
 
   ScriptApp.newTrigger('runScheduledOutreach')
     .timeBased()

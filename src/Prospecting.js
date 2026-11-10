@@ -12,7 +12,9 @@
 var DAILY_PROSPECT_SCHEDULE = [
   { until: '2026-10-03', target: 8 },
   { until: '2026-10-10', target: 6 },
-  { until: '2026-10-25', target: 3 }
+  { until: '2026-10-25', target: 10 },
+  // Oct 26 cycle: ~30 credits/day at ~1.7 credits per company, split across PROSPECTING_HOURS.
+  { until: '2026-11-25', target: 17 }
 ];
 var MAX_DISCOVERY_PAGES_PER_RUN = 5;
 
@@ -37,6 +39,23 @@ function prospectQuotas_(categories, total, date) {
   });
 }
 
+/**
+ * This run's share of the day's target: the daily target is split evenly across the
+ * PROSPECTING_HOURS runs (src/Triggers.js), with any remainder going to the earliest runs,
+ * so the day's total never exceeds the daily target. A manual run outside those hours
+ * counts as the most recent scheduled slot.
+ */
+function prospectRunTarget_(date) {
+  var daily = dailyProspectTarget_(date);
+  var hour = Number(Utilities.formatDate(date, Session.getScriptTimeZone(), 'H'));
+  var runs = PROSPECTING_HOURS.length;
+  var index = 0;
+  for (var i = 0; i < runs; i++) {
+    if (hour >= PROSPECTING_HOURS[i]) index = i;
+  }
+  return Math.floor(daily / runs) + (index < daily % runs ? 1 : 0);
+}
+
 function runDailyProspecting() {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(5 * 60 * 1000)) {
@@ -45,7 +64,7 @@ function runDailyProspecting() {
 
   try {
     var now = new Date();
-    var dailyTarget = dailyProspectTarget_(now);
+    var dailyTarget = prospectRunTarget_(now);
 
     // Prioritize finding emails for sponsors already on the list before spending any of
     // today's Apollo budget discovering brand-new companies.
