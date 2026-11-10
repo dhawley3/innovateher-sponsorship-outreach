@@ -98,8 +98,10 @@ function resolveSponsorContact_(sponsor) {
   if (hasApolloSearchMarker_(sponsor.notes)) return null;
 
   var org = apolloFindOrganization(sponsor.sponsorName);
-  var contact = org ? findContactAtOrganization_(org.id) : null;
+  var contact = org ? findContactAtOrganization_(org.id, org) : null;
   appendRowNote_(sponsor.sheetName, sponsor.rowNumber, apolloSearchMarker_(contact));
+  // Save right away so a later drafting failure/timeout doesn't lose a paid-for contact.
+  if (contact) setSponsorContact_(sponsor.sheetName, sponsor.rowNumber, contact);
   return contact;
 }
 
@@ -121,7 +123,7 @@ function fillMissingSponsorEmails_(maxLookups) {
     attempted++;
     try {
       var org = apolloFindOrganization(row.sponsorName);
-      var contact = org ? findContactAtOrganization_(org.id) : null;
+      var contact = org ? findContactAtOrganization_(org.id, org) : null;
       appendRowNote_(row.sheetName, row.rowNumber, apolloSearchMarker_(contact));
 
       if (contact) {
@@ -143,16 +145,33 @@ var APOLLO_SEARCH_MARKER = 'Apollo contact search';
 function apolloSearchMarker_(contact) {
   return '[' + APOLLO_SEARCH_MARKER + ' ' +
     Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'M/d/yyyy') + ': ' +
-    (contact ? 'found' : 'none found') + ']';
+    (contact ? (contact.isGeneralInbox ? 'general inbox from website' : 'found') : 'none found') + ']';
 }
 
 function hasApolloSearchMarker_(notes) {
   return String(notes || '').indexOf(APOLLO_SEARCH_MARKER) !== -1;
 }
 
-function findContactAtOrganization_(organizationId) {
+/**
+ * `org` (the Apollo organization record) is optional: when given and Apollo has no person
+ * with a verified email, falls back to a general inbox (info@, support@, ...) found on
+ * the company's own website. Callers that only pass an id get Apollo results only.
+ */
+function findContactAtOrganization_(organizationId, org) {
+  var contact = findApolloPersonContact_(organizationId);
+  if (contact || !org) return contact;
+  return findGeneralCompanyEmail_(org);
+}
+
+function findApolloPersonContact_(organizationId) {
   var allTitles = [].concat.apply([], SPONSOR_CONTACT_TITLE_TIERS);
-  var ranked = rankSponsorContacts_(apolloFindPeopleAtOrganization(organizationId, allTitles));
+  var people = apolloFindPeopleAtOrganization(organizationId, allTitles);
+  // Small brands often have nobody with a recruiting/CSR/partnerships title, so fall back
+  // to everyone at the company -- ranking still puts the guide's preferred titles first.
+  if (!people.length) {
+    people = apolloFindPeopleAtOrganization(organizationId, []);
+  }
+  var ranked = rankSponsorContacts_(people);
 
   for (var i = 0; i < Math.min(ranked.length, MAX_ENRICH_ATTEMPTS_PER_SPONSOR); i++) {
     var enriched = apolloEnrichPerson(ranked[i].id);
@@ -165,6 +184,76 @@ function findContactAtOrganization_(organizationId) {
     }
   }
   return null;
+}
+
+// Pages tried, in order, on the company's site when Apollo has no usable person.
+// /pages/contact is Shopify's default, which a lot of small in-kind brands run on.
+var GENERAL_EMAIL_PAGE_PATHS = ['/', '/contact', '/contact-us', '/pages/contact', '/pages/contact-us', '/about'];
+
+// Inbox prefixes in preference order: anything sponsorship-related first, then the
+// catch-all general inboxes, then support/help as a last resort.
+var GENERAL_EMAIL_PREFIX_PRIORITY = [
+  'partnerships', 'partnership', 'partners', 'sponsorship', 'sponsorships', 'marketing', 'pr', 'press',
+  'community', 'collabs', 'collab', 'info', 'hello', 'hi', 'contact', 'team', 'office',
+  'support', 'help', 'customerservice', 'customercare', 'care', 'service'
+];
+
+var GENERAL_EMAIL_NOISE_ = /^(no-?reply|donotreply|privacy|legal|abuse|webmaster|postmaster|careers|jobs|hr|recruiting|unsubscribe)$/;
+
+/**
+ * Last-resort contact: a general inbox scraped from the company's own website (the domain
+ * comes from Apollo's organization record). Only addresses on that same domain count, so a
+ * third-party address embedded in the page (agency, payment processor) is never picked.
+ * Returns null when Apollo has no domain for the company or nothing usable is on the site.
+ */
+function findGeneralCompanyEmail_(org) {
+  var domain = companyDomain_(org);
+  if (!domain) return null;
+
+  var found = {};
+  for (var i = 0; i < GENERAL_EMAIL_PAGE_PATHS.length; i++) {
+    extractEmailsFromPage_('https://' + domain + GENERAL_EMAIL_PAGE_PATHS[i]).forEach(function (email) {
+      var parts = email.split('@');
+      var host = parts[1];
+      if ((host === domain || host.slice(-(domain.length + 1)) === '.' + domain) && !GENERAL_EMAIL_NOISE_.test(parts[0])) {
+        found[email] = true;
+      }
+    });
+    // Stop early once a preferred-prefix inbox turns up -- each page fetch costs execution time.
+    if (Object.keys(found).some(function (e) { return generalEmailRank_(e) < GENERAL_EMAIL_PREFIX_PRIORITY.length; })) break;
+  }
+
+  var emails = Object.keys(found).sort(function (a, b) { return generalEmailRank_(a) - generalEmailRank_(b); });
+  if (!emails.length) return null;
+
+  Logger.log('Apollo had no contact for ' + (org.name || domain) + '; using general inbox ' + emails[0] + ' from its website.');
+  return { name: 'General team', firstName: '', email: emails[0], isGeneralInbox: true };
+}
+
+function companyDomain_(org) {
+  var raw = String(org.primary_domain || org.website_url || '').trim().toLowerCase();
+  return raw.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0] || '';
+}
+
+function extractEmailsFromPage_(url) {
+  try {
+    var response = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
+    if (response.getResponseCode() >= 400) return [];
+    var html = response.getContentText().replace(/&#64;|&#x40;|\[at\]|\(at\)/gi, '@');
+    var matches = html.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) || [];
+    return matches
+      .map(function (e) { return e.toLowerCase().replace(/^[._%+-]+/, ''); })
+      .filter(function (e) { return !/\.(png|jpe?g|gif|svg|webp|css|js)$/.test(e); });
+  } catch (err) {
+    Logger.log('Could not fetch ' + url + ' while looking for a general email: ' + err.message);
+    return [];
+  }
+}
+
+function generalEmailRank_(email) {
+  var prefix = email.split('@')[0].replace(/[._-]/g, '');
+  var i = GENERAL_EMAIL_PREFIX_PRIORITY.indexOf(prefix);
+  return i === -1 ? GENERAL_EMAIL_PREFIX_PRIORITY.length : i;
 }
 
 function contactTitleTier_(title) {

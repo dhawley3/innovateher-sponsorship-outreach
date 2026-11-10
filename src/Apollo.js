@@ -11,8 +11,7 @@ function apolloRequest_(path, payload) {
     contentType: 'application/json',
     headers: { 'x-api-key': getApolloApiKey_() },
     payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  });
+    muteHttpExceptions: true});
 
   var code = response.getResponseCode();
   if (code >= 300) {
@@ -25,27 +24,21 @@ function apolloRequest_(path, payload) {
  * Finds a sponsor's organization record by name, used to get its Apollo organization_id
  * before searching for people there.
  */
-function apolloFindOrganization(sponsorName) {
-  var result = apolloRequest_('/mixed_companies/search', {
-    q_organization_name: sponsorName,
-    page: 1,
-    per_page: 1
-  });
-  var orgs = result.organizations || result.accounts || [];
-  return orgs.length ? orgs[0] : null;
-}
+function apolloFindOrganization(sponsorName) { var direct = apolloSearchOrganization_(sponsorName); if (direct) return direct; var cleaned = cleanOrganizationName_(sponsorName); if (!cleaned || cleaned.toLowerCase() === String(sponsorName || '').trim().toLowerCase()) return null; return apolloSearchOrganization_(cleaned); }
 
+function apolloSearchOrganization_(name) { if (!name) return null; var result = apolloRequest_('/mixed_companies/search', { q_organization_name: name, page: 1, per_page: 1 }); var orgs = result.organizations || result.accounts || []; return orgs.length ? orgs[0] : null; }
+
+var ORGANIZATION_NAME_SUFFIXES_ = [' maps', ' inc.', ' inc', ' llc.', ' llc', ' group', ' corp.', ' corp', ' corporation', ' company', ' co.', ' co', '.com'];
+
+function cleanOrganizationName_(name) { var cleaned = String(name || '').trim(); var changed = true; while (changed) { changed = false; var lower = cleaned.toLowerCase(); for (var i = 0; i < ORGANIZATION_NAME_SUFFIXES_.length; i++) { var suffix = ORGANIZATION_NAME_SUFFIXES_[i]; if (lower.length > suffix.length && lower.slice(-suffix.length) === suffix) { cleaned = cleaned.slice(0, cleaned.length - suffix.length).trim(); changed = true; break; } } } return cleaned; }
 /**
  * Searches for people at an organization matching one of the target job-title categories
  * (e.g. partnerships, marketing, community relations).
  */
 function apolloFindPeopleAtOrganization(organizationId, titleKeywords) {
-  var result = apolloRequest_('/mixed_people/api_search', {
-    organization_ids: [organizationId],
-    person_titles: titleKeywords,
-    page: 1,
-    per_page: 25
-  });
+  var payload = { organization_ids: [organizationId], page: 1, per_page: 25 };
+  if (titleKeywords && titleKeywords.length) payload.person_titles = titleKeywords;
+  var result = apolloRequest_('/mixed_people/api_search', payload);
   return result.people || [];
 }
 
