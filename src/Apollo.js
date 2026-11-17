@@ -22,15 +22,57 @@ function apolloRequest_(path, payload) {
 
 /**
  * Finds a sponsor's organization record by name, used to get its Apollo organization_id
- * before searching for people there.
+ * before searching for people there. Tries the name as-is first, then once more with
+ * trailing suffixes like "Inc." or ".com" stripped off if that changes anything.
  */
-function apolloFindOrganization(sponsorName) { var direct = apolloSearchOrganization_(sponsorName); if (direct) return direct; var cleaned = cleanOrganizationName_(sponsorName); if (!cleaned || cleaned.toLowerCase() === String(sponsorName || '').trim().toLowerCase()) return null; return apolloSearchOrganization_(cleaned); }
+function apolloFindOrganization(sponsorName) {
+  var direct = apolloSearchOrganization_(sponsorName);
+  if (direct) return direct;
 
-function apolloSearchOrganization_(name) { if (!name) return null; var result = apolloRequest_('/mixed_companies/search', { q_organization_name: name, page: 1, per_page: 1 }); var orgs = result.organizations || result.accounts || []; return orgs.length ? orgs[0] : null; }
+  var cleaned = cleanOrganizationName_(sponsorName);
+  if (!cleaned || cleaned.toLowerCase() === String(sponsorName || '').trim().toLowerCase()) {
+    return null;
+  }
+  return apolloSearchOrganization_(cleaned);
+}
 
-var ORGANIZATION_NAME_SUFFIXES_ = [' maps', ' inc.', ' inc', ' llc.', ' llc', ' group', ' corp.', ' corp', ' corporation', ' company', ' co.', ' co', '.com'];
+function apolloSearchOrganization_(name) {
+  if (!name) return null;
+  var result = apolloRequest_('/mixed_companies/search', { q_organization_name: name, page: 1, per_page: 1 });
+  var orgs = result.organizations || result.accounts || [];
+  return orgs.length ? orgs[0] : null;
+}
 
-function cleanOrganizationName_(name) { var cleaned = String(name || '').trim(); var changed = true; while (changed) { changed = false; var lower = cleaned.toLowerCase(); for (var i = 0; i < ORGANIZATION_NAME_SUFFIXES_.length; i++) { var suffix = ORGANIZATION_NAME_SUFFIXES_[i]; if (lower.length > suffix.length && lower.slice(-suffix.length) === suffix) { cleaned = cleaned.slice(0, cleaned.length - suffix.length).trim(); changed = true; break; } } } return cleaned; }
+var ORGANIZATION_NAME_SUFFIXES_ = [
+  ' maps', ' inc.', ' inc', ' llc.', ' llc', ' group',
+  ' corp.', ' corp', ' corporation', ' company', ' co.', ' co', '.com'
+];
+
+/**
+ * Strips trailing suffixes like " Inc.", " LLC", or ".com" off a company name, repeatedly
+ * (so "Foo Inc. Group" loses both), to give apolloFindOrganization a second, cleaner name
+ * to search with when the raw name finds nothing.
+ */
+function cleanOrganizationName_(name) {
+  var cleaned = String(name || '').trim();
+  var changed = true;
+
+  while (changed) {
+    changed = false;
+    var lower = cleaned.toLowerCase();
+    for (var i = 0; i < ORGANIZATION_NAME_SUFFIXES_.length; i++) {
+      var suffix = ORGANIZATION_NAME_SUFFIXES_[i];
+      if (lower.length > suffix.length && lower.slice(-suffix.length) === suffix) {
+        cleaned = cleaned.slice(0, cleaned.length - suffix.length).trim();
+        changed = true;
+        break;
+      }
+    }
+  }
+
+  return cleaned;
+}
+
 /**
  * Searches for people at an organization matching one of the target job-title categories
  * (e.g. partnerships, marketing, community relations).
