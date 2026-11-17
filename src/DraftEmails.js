@@ -64,5 +64,16 @@ function saveDraftForReview(personKey, reviewerEmail, sponsorContactEmail, subje
     }
   }
 
-  sendDraftForReview(reviewerEmail, sponsorContactEmail, subject, body);
+  // Not wrapped the same as the paths above used to mean a MailApp failure here (e.g. its
+  // daily send quota) propagated out of saveDraftForReview entirely -- which skipped
+  // markDraftCreated for that sponsor, so the next run drafted the exact same sponsor again
+  // (the own-account Gmail draft above always succeeds, so this repeated every run). Catching
+  // it here means that always-created own-account draft is the fallback-of-last-resort, exactly
+  // as documented above, instead of this path silently producing duplicates forever.
+  try {
+    sendDraftForReview(reviewerEmail, sponsorContactEmail, subject, body);
+  } catch (err) {
+    Logger.log('Reviewer-notification email failed for ' + reviewerEmail + ' (' + sponsorContactEmail +
+      '); relying on the script account\'s own Gmail Drafts copy instead: ' + err.message);
+  }
 }
