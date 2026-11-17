@@ -23,11 +23,38 @@ function sendDraftForReview(reviewerEmail, sponsorContactEmail, subject, body) {
 }
 
 /**
- * Real Outlook draft when the responsible teammate has authorized Microsoft Graph,
+ * Draft in the Apps Script project's own Gmail account (whoever runs/owns the script --
+ * GmailApp always acts as that identity, never as an arbitrary teammate). Created alongside
+ * the Outlook draft/fallback below as a second copy, not a replacement, so this is a visible
+ * backstop even when a teammate's Outlook auth or Graph call is having problems.
+ */
+function createGmailDraft_(sponsorContactEmail, subject, body) {
+  GmailApp.createDraft(sponsorContactEmail, subject, body);
+}
+
+/**
+ * Real draft in the responsible teammate's OWN mailbox when they've authorized one --
+ * their Gmail first (GmailDraftsAuth.js), then their Outlook (MicrosoftGraphAuth.js) --
  * otherwise the emailed-notification fallback above. personKey is the same lowercased
- * first name used for the Team Emails lookup (sponsor.responsible).
+ * first name used for the Team Emails lookup (sponsor.responsible). Also always leaves a
+ * copy in the script account's own Gmail Drafts folder, regardless of which path ran.
  */
 function saveDraftForReview(personKey, reviewerEmail, sponsorContactEmail, subject, body) {
+  try {
+    createGmailDraft_(sponsorContactEmail, subject, body);
+  } catch (err) {
+    Logger.log('Gmail draft creation failed for ' + sponsorContactEmail + ': ' + err.message);
+  }
+
+  if (isGmailDraftsAuthorizedForTeammate(personKey)) {
+    try {
+      createGmailDraftForTeammate(personKey, sponsorContactEmail, subject, body);
+      return;
+    } catch (err) {
+      Logger.log('Teammate Gmail draft creation failed for ' + personKey + ', trying Outlook next: ' + err.message);
+    }
+  }
+
   if (isOutlookAuthorizedForTeammate(personKey)) {
     try {
       createOutlookDraft(personKey, sponsorContactEmail, subject, body);

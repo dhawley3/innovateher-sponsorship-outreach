@@ -13,6 +13,14 @@ function getDigestRecipient_() {
   return requireProperty_('DIGEST_RECIPIENT_EMAIL');
 }
 
+function getGoogleGmailOauthClientId_() {
+  return requireProperty_('GOOGLE_GMAIL_OAUTH_CLIENT_ID');
+}
+
+function getGoogleGmailOauthClientSecret_() {
+  return requireProperty_('GOOGLE_GMAIL_OAUTH_CLIENT_SECRET');
+}
+
 function getMasterListSpreadsheetId_() {
   return requireProperty_('MASTER_LIST_SPREADSHEET_ID');
 }

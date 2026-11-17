@@ -88,6 +88,10 @@ function authorizeOutlookForDrew() {
   authorizeOutlookForTeammate('drew');
 }
 
+function authorizeOutlookForRuchira() {
+  authorizeOutlookForTeammate('ruchira');
+}
+
 function isOutlookAuthorizedForTeammate(personKey) {
   return getMsGraphServiceFor_(personKey).hasAccess();
 }

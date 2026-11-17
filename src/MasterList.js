@@ -148,8 +148,11 @@ function getSponsorsAwaitingResponse(minDaysAgo) {
 /**
  * Rows across every category tab that have a company name but no email yet, skipping any
  * row Apollo already searched (see hasApolloSearchMarker_ in OutreachWorkflow.js) so a
- * permanent miss isn't retried indefinitely. Used to prioritize finding emails for sponsors
- * already on the list ahead of spending Apollo credits discovering brand-new companies.
+ * permanent miss isn't retried indefinitely. Only rows whose Responsible is someone actually
+ * in the IH Team Emails sheet (see TeamDirectory.js) qualify -- a blank or unrecognized
+ * Responsible means nobody on the team has claimed this sponsor yet, so it's not worth
+ * spending an Apollo credit on until someone does. Used to prioritize finding emails for
+ * sponsors already on the list ahead of spending Apollo credits discovering brand-new ones.
  */
 function getSponsorsMissingEmail_() {
   var results = [];
@@ -160,14 +163,16 @@ function getSponsorsMissingEmail_() {
     var nameCol = headerIndex_(header, 'Company Name');
     var emailCol = headerIndex_(header, 'Email');
     var notesCol = headerIndex_(header, 'Notes');
+    var responsibleCol = headerIndex_(header, 'Responsible');
 
     for (var i = 1; i < values.length; i++) {
       var row = values[i];
       var name = String(row[nameCol] || '').trim();
       var email = String(row[emailCol] || '').trim();
       var notes = String(row[notesCol] || '').trim();
+      var responsible = String(row[responsibleCol] || '').trim();
 
-      if (name && !email && !hasApolloSearchMarker_(notes)) {
+      if (name && !email && !hasApolloSearchMarker_(notes) && getTeamDirectoryEntry_(responsible)) {
         results.push({ sheetName: entry.name, rowNumber: i + 1, sponsorName: name, notes: notes });
       }
     }

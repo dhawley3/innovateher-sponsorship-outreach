@@ -63,8 +63,10 @@ function runDailyOutreach() {
         }
 
         var draft = draftOutreachEmail(sponsor.sponsorName, contact.firstName || 'there', sponsor.category, getResponsibleDisplayName_(sponsor.responsible), sponsor.notes);
+        Logger.log('Drafting ' + sponsor.sponsorName + ': saving draft for ' + reviewerEmail);
         saveDraftForReview(sponsor.responsible, reviewerEmail, contact.email, draft.subject, draft.body);
         markDraftCreated(sponsor.sheetName, sponsor.rowNumber, contact.name, contact.email);
+        Logger.log('Drafted ' + sponsor.sponsorName + ' -> ' + contact.email);
         emailsHandledThisRun[emailKey] = true;
         draftCountByReviewer[reviewerKey] = (draftCountByReviewer[reviewerKey] || 0) + 1;
         draftsCreated.push({ sponsorName: sponsor.sponsorName, contactEmail: contact.email });
@@ -95,7 +97,17 @@ function resolveSponsorContact_(sponsor) {
     };
   }
 
-  if (hasApolloSearchMarker_(sponsor.notes)) return null;
+  if (hasApolloSearchMarker_(sponsor.notes)) {
+    // Rows Apollo came up empty for before the website fallback existed get one
+    // website-only pass (no people search/enrichment), marked so it isn't repeated.
+    if (!apolloMarkerSaysNoneFound_(sponsor.notes) || hasGeneralInboxMarker_(sponsor.notes)) return null;
+    var knownOrg = apolloFindOrganization(sponsor.sponsorName);
+    var inbox = knownOrg ? findGeneralCompanyEmail_(knownOrg) : null;
+    if (!knownOrg) Logger.log('Apollo has no company record for ' + sponsor.sponsorName + ', so no website to check.');
+    appendRowNote_(sponsor.sheetName, sponsor.rowNumber, generalInboxMarker_(inbox));
+    if (inbox) setSponsorContact_(sponsor.sheetName, sponsor.rowNumber, inbox);
+    return inbox;
+  }
 
   var org = apolloFindOrganization(sponsor.sponsorName);
   var contact = org ? findContactAtOrganization_(org.id, org) : null;
@@ -150,6 +162,22 @@ function apolloSearchMarker_(contact) {
 
 function hasApolloSearchMarker_(notes) {
   return String(notes || '').indexOf(APOLLO_SEARCH_MARKER) !== -1;
+}
+
+function apolloMarkerSaysNoneFound_(notes) {
+  return /\[Apollo contact search [^\]]*: none found\]/.test(String(notes || ''));
+}
+
+var GENERAL_INBOX_MARKER = 'General inbox search';
+
+function generalInboxMarker_(contact) {
+  return '[' + GENERAL_INBOX_MARKER + ' ' +
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'M/d/yyyy') + ': ' +
+    (contact ? 'found' : 'none found') + ']';
+}
+
+function hasGeneralInboxMarker_(notes) {
+  return String(notes || '').indexOf(GENERAL_INBOX_MARKER) !== -1;
 }
 
 /**
@@ -208,7 +236,10 @@ var GENERAL_EMAIL_NOISE_ = /^(no-?reply|donotreply|privacy|legal|abuse|webmaster
  */
 function findGeneralCompanyEmail_(org) {
   var domain = companyDomain_(org);
-  if (!domain) return null;
+  if (!domain) {
+    Logger.log('Apollo has no website for ' + (org.name || 'this company') + ', so no general inbox to look for.');
+    return null;
+  }
 
   var found = {};
   for (var i = 0; i < GENERAL_EMAIL_PAGE_PATHS.length; i++) {

@@ -135,9 +135,13 @@ function requestSponsorEvaluation_(apiKey, companyName, discoveryCategory, guide
   };
 }
 
+// Set after the first failed personalization call in an execution, so one overloaded
+// Gemini doesn't get retried (and possibly hang) once per sponsor for the rest of the run.
+var geminiPersonalizationDownThisRun_ = false;
+
 function generateBrandPersonalization_(sponsorName, category, notes, introParagraph) {
   var apiKey = SCRIPT_PROPS.getProperty('GEMINI_API_KEY');
-  if (!apiKey) return '';
+  if (!apiKey || geminiPersonalizationDownThisRun_) return '';
 
   var model = SCRIPT_PROPS.getProperty('GEMINI_MODEL') || GEMINI_DEFAULT_MODEL;
   var prompt = [
@@ -169,13 +173,16 @@ function generateBrandPersonalization_(sponsorName, category, notes, introParagr
         headers: { 'x-goog-api-key': apiKey },
         payload: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.6 }
+          // No "thinking" for a 1-2 sentence add-on: when Gemini is overloaded, thinking
+          // calls can hang for minutes and run the whole outreach job into its 6-min limit.
+          generationConfig: { temperature: 0.6, maxOutputTokens: 200, thinkingConfig: { thinkingBudget: 0 } }
         }),
         muteHttpExceptions: true
       }
     );
 
     if (response.getResponseCode() !== 200) {
+      if (response.getResponseCode() >= 429) geminiPersonalizationDownThisRun_ = true;
       Logger.log('Gemini personalization skipped for ' + sponsorName + ' (' + response.getResponseCode() + '): ' + response.getContentText().slice(0, 300));
       return '';
     }
@@ -192,6 +199,7 @@ function generateBrandPersonalization_(sponsorName, category, notes, introParagr
     }
     return text;
   } catch (err) {
+    geminiPersonalizationDownThisRun_ = true;
     Logger.log('Gemini personalization skipped for ' + sponsorName + ': ' + err.message);
     return '';
   }

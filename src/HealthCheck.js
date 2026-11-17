@@ -13,7 +13,7 @@ var HEALTH_CHECK_REQUIRED_PROPERTIES = [
   'EMAIL_TEMPLATE_DOC_ID'
 ];
 
-function doGet(e) {
+function healthCheckDoGet(e) {
   var expectedToken = SCRIPT_PROPS.getProperty('HEALTH_CHECK_TOKEN');
   var providedToken = e && e.parameter && e.parameter.token;
 

@@ -10,12 +10,12 @@
 var STANDARD_OUTREACH_OPENER = 'My name is [Your Name], and I’m part of the team organizing InnovateHer at Purdue University. ' +
   'I’m reaching out to introduce an opportunity for [COMPANY NAME] to engage with a highly motivated and underrepresented student talent pool.';
 
-// Replaces every category template's own subject line, so all outreach drafts use the
-// same subject regardless of what the template Doc says.
+// Fallback subject used only when a template section in the Doc has no "Subject:" line
+// of its own -- otherwise the Doc's own subject (with placeholders filled in) is used.
 var STANDARD_OUTREACH_SUBJECT = 'Strategic Partnership Opportunity with Purdue’s Leading Women-Centric Hackathon';
 
-// Replaces the follow-up template's own subject line, so all follow-up drafts use the
-// same subject regardless of what the template Doc says.
+// Fallback subject used only when the follow-up template section in the Doc has no
+// "Subject:" line of its own -- otherwise the Doc's own subject is used.
 var STANDARD_FOLLOW_UP_SUBJECT = 'Follow-Up: InnovateHer 2027 Sponsorship Opportunity';
 
 function getEmailTemplateFullText_() {
@@ -120,16 +120,19 @@ function draftOutreachEmail(sponsorName, contactFirstName, category, senderName,
     throw new Error('No email template mapped for category "' + category + '".');
   }
 
+  Logger.log('Drafting ' + sponsorName + ': loading template Doc');
   var section = extractTemplateSection_(getEmailTemplateFullText_(), heading);
   var split = splitSubjectAndBody_(section);
   var fields = { sponsorName: sponsorName, contactFirstName: contactFirstName, senderName: senderName };
   var body = mapIntroParagraph_(fillPlaceholders_(split.body, fields), function () {
     return fillPlaceholders_(STANDARD_OUTREACH_OPENER, fields);
   });
+  Logger.log('Drafting ' + sponsorName + ': calling Gemini');
   var personalization = generateBrandPersonalization_(sponsorName, category, notes, getIntroParagraph_(body));
+  var subject = split.subject ? fillPlaceholders_(split.subject, fields) : STANDARD_OUTREACH_SUBJECT;
 
   return {
-    subject: STANDARD_OUTREACH_SUBJECT,
+    subject: subject,
     body: addParagraphSpacing_(insertPersonalization_(body, personalization))
   };
 }
@@ -143,9 +146,10 @@ function draftFollowUpEmail(sponsorName, contactFirstName, senderName) {
   var section = extractTemplateSection_(getEmailTemplateFullText_(), FOLLOW_UP_TEMPLATE_HEADING);
   var split = splitSubjectAndBody_(section);
   var fields = { sponsorName: sponsorName, contactFirstName: contactFirstName, senderName: senderName };
+  var subject = split.subject ? fillPlaceholders_(split.subject, fields) : STANDARD_FOLLOW_UP_SUBJECT;
 
   return {
-    subject: STANDARD_FOLLOW_UP_SUBJECT,
+    subject: subject,
     body: addParagraphSpacing_(fillPlaceholders_(split.body, fields))
   };
 }
