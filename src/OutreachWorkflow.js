@@ -22,10 +22,18 @@ var MAX_ENRICH_ATTEMPTS_PER_SPONSOR = 2;
 // later run, same as anyone skipped for any other reason below.
 var MAX_DRAFTS_PER_REVIEWER_PER_RUN = 8;
 
+// How long a run waits to acquire the lock before giving up entirely for this trigger
+// fire. 5 seconds meant any overlap with another run (manual + scheduled, or two manual
+// runs) just silently dropped the whole run with nothing left behind but a log line. 30
+// seconds gives genuine overlaps a real chance to resolve without risking a long hang if
+// the other run is actually stuck.
+var OUTREACH_LOCK_WAIT_MS = 30 * 1000;
+
 function runDailyOutreach() {
   var lock = LockService.getScriptLock();
-  if (!lock.tryLock(5000)) {
+  if (!lock.tryLock(OUTREACH_LOCK_WAIT_MS)) {
     Logger.log('Another run is already in progress, skipping this one.');
+    logSkipsForDigest_([{ sponsorName: '(entire run)', reason: 'Another run was already in progress; this run was skipped entirely' }]);
     return;
   }
 
@@ -33,6 +41,7 @@ function runDailyOutreach() {
   try {
     var sponsors = getUncontactedSponsors();
     var draftsCreated = [];
+    var skipped = [];
     var emailsHandledThisRun = {};
     var draftCountByReviewer = {};
 
@@ -46,27 +55,32 @@ function runDailyOutreach() {
       try {
         var reviewerEmail = getResponsibleEmail_(sponsor.responsible);
         if (!reviewerEmail) {
-          Logger.log('No Purdue email on file for "' + sponsor.responsible + '" (add them to the Team Emails sheet), skipping ' + sponsor.sponsorName);
-          return;
+          var noEmailReason = 'No Purdue email on file for "' + sponsor.responsible + '" (add them to the Team Emails sheet)';
+          Logger.log(noEmailReason + ', skipping ' + sponsor.sponsorName);
+          skipped.push({ sponsorName: sponsor.sponsorName, reason: noEmailReason });
+          continue;
         }
 
         var reviewerKey = reviewerEmail.toLowerCase();
         if ((draftCountByReviewer[reviewerKey] || 0) >= MAX_DRAFTS_PER_REVIEWER_PER_RUN) {
-          Logger.log(reviewerEmail + ' already hit the ' + MAX_DRAFTS_PER_REVIEWER_PER_RUN +
-            '-draft cap for this run, skipping ' + sponsor.sponsorName + ' until next run.');
-          return;
+          var capReason = reviewerEmail + ' already hit the ' + MAX_DRAFTS_PER_REVIEWER_PER_RUN + '-draft cap for this run';
+          Logger.log(capReason + ', skipping ' + sponsor.sponsorName + ' until next run.');
+          skipped.push({ sponsorName: sponsor.sponsorName, reason: capReason });
+          continue;
         }
 
         var contact = resolveSponsorContact_(sponsor);
         if (!contact) {
           Logger.log('No contact found for ' + sponsor.sponsorName + ', skipping.');
-          return;
+          skipped.push({ sponsorName: sponsor.sponsorName, reason: 'No contact found' });
+          continue;
         }
 
         var emailKey = contact.email.toLowerCase();
         if (emailsHandledThisRun[emailKey]) {
           Logger.log(contact.email + ' was already drafted to earlier in this run, skipping ' + sponsor.sponsorName);
-          return;
+          skipped.push({ sponsorName: sponsor.sponsorName, reason: 'Already drafted to the same contact earlier in this run' });
+          continue;
         }
 
         var draft = draftOutreachEmail(sponsor.sponsorName, contact.firstName || 'there', sponsor.category, getResponsibleDisplayName_(sponsor.responsible), sponsor.notes);
@@ -79,12 +93,14 @@ function runDailyOutreach() {
         draftsCreated.push({ sponsorName: sponsor.sponsorName, contactEmail: contact.email });
       } catch (err) {
         Logger.log('Failed to process ' + sponsor.sponsorName + ': ' + err.message);
+        skipped.push({ sponsorName: sponsor.sponsorName, reason: 'Error: ' + err.message });
       }
     }
 
-    var followUpsSent = runFollowUpsInternal_();
+    var followUpResult = runFollowUpsInternal_();
     logForDigest_('Outreach', draftsCreated);
-    logForDigest_('Follow-up', followUpsSent);
+    logForDigest_('Follow-up', followUpResult.sent);
+    logSkipsForDigest_(skipped.concat(followUpResult.skipped));
   } finally {
     lock.releaseLock();
   }

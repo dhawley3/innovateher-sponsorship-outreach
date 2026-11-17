@@ -16,9 +16,10 @@ var FOLLOW_UP_MIN_CONTACT_DATE = new Date('2026-10-01');
  */
 function runFollowUps() {
   var lock = LockService.getScriptLock();
-  if (!lock.tryLock(5000)) {
+  if (!lock.tryLock(OUTREACH_LOCK_WAIT_MS)) {
     Logger.log('Another run is already in progress, skipping this one.');
-    return [];
+    logSkipsForDigest_([{ sponsorName: '(entire run)', reason: 'Another run was already in progress; this run was skipped entirely' }]);
+    return { sent: [], skipped: [] };
   }
 
   try {
@@ -31,6 +32,7 @@ function runFollowUps() {
 function runFollowUpsInternal_() {
   var pending = getSponsorsAwaitingResponse(FOLLOW_UP_WAIT_DAYS);
   var followUpsSent = [];
+  var skipped = [];
   var emailsHandledThisRun = {};
   var draftCountByReviewer = {};
 
@@ -38,7 +40,9 @@ function runFollowUpsInternal_() {
     try {
       var reviewerEmail = getResponsibleEmail_(sponsor.responsible);
       if (!reviewerEmail) {
-        Logger.log('No Purdue email on file for "' + sponsor.responsible + '" (add them to the Team Emails sheet), skipping follow-up for ' + sponsor.sponsorName);
+        var noEmailReason = 'No Purdue email on file for "' + sponsor.responsible + '" (add them to the Team Emails sheet)';
+        Logger.log(noEmailReason + ', skipping follow-up for ' + sponsor.sponsorName);
+        skipped.push({ sponsorName: sponsor.sponsorName, reason: noEmailReason });
         return;
       }
 
@@ -47,14 +51,16 @@ function runFollowUpsInternal_() {
       // person all go out in a single run with no rate limiting at all.
       var reviewerKey = reviewerEmail.toLowerCase();
       if ((draftCountByReviewer[reviewerKey] || 0) >= MAX_DRAFTS_PER_REVIEWER_PER_RUN) {
-        Logger.log(reviewerEmail + ' already hit the ' + MAX_DRAFTS_PER_REVIEWER_PER_RUN +
-          '-draft cap for this run, skipping follow-up for ' + sponsor.sponsorName + ' until next run.');
+        var capReason = reviewerEmail + ' already hit the ' + MAX_DRAFTS_PER_REVIEWER_PER_RUN + '-draft cap for this run';
+        Logger.log(capReason + ', skipping follow-up for ' + sponsor.sponsorName + ' until next run.');
+        skipped.push({ sponsorName: sponsor.sponsorName, reason: capReason });
         return;
       }
 
       var emailKey = String(sponsor.contactEmail || '').toLowerCase();
       if (emailKey && emailsHandledThisRun[emailKey]) {
         Logger.log(sponsor.contactEmail + ' already got a follow-up drafted earlier in this run, skipping ' + sponsor.sponsorName);
+        skipped.push({ sponsorName: sponsor.sponsorName, reason: 'Already got a follow-up drafted earlier in this run' });
         return;
       }
 
@@ -67,8 +73,9 @@ function runFollowUpsInternal_() {
       followUpsSent.push({ sponsorName: sponsor.sponsorName, contactEmail: sponsor.contactEmail });
     } catch (err) {
       Logger.log('Failed to draft follow-up for ' + sponsor.sponsorName + ': ' + err.message);
+      skipped.push({ sponsorName: sponsor.sponsorName, reason: 'Error: ' + err.message });
     }
   });
 
-  return followUpsSent;
+  return { sent: followUpsSent, skipped: skipped };
 }

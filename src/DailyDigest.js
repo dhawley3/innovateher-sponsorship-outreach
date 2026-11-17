@@ -31,6 +31,19 @@ function logForDigest_(type, items) {
 }
 
 /**
+ * Logs skip reasons ("no Purdue email on file", "hit the per-reviewer cap", etc.) so they
+ * reach the daily digest instead of only ever showing up in the Apps Script execution log,
+ * which nobody reads unless they already suspect something's wrong. Reuses the existing
+ * 4-column Digest Log schema -- the reason goes in the "Contact Email" column for 'Skipped'
+ * rows, same as every other type reuses that column for its own per-item detail.
+ */
+function logSkipsForDigest_(skipped) {
+  logForDigest_('Skipped', skipped.map(function (item) {
+    return { sponsorName: item.sponsorName, contactEmail: item.reason };
+  }));
+}
+
+/**
  * Trigger handler. Holds the script lock so an outreach run can't append to the log
  * between reading it and clearing it.
  */
@@ -45,12 +58,20 @@ function sendScheduledDigest() {
     var lastRow = sheet.getLastRow();
     var rows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, 4).getValues() : [];
 
-    var buckets = { 'Outreach': [], 'Follow-up': [], 'Prospect': [], 'Email Found': [] };
+    var buckets = { 'Outreach': [], 'Follow-up': [], 'Prospect': [], 'Email Found': [], 'Skipped': [] };
     rows.forEach(function (row) {
       (buckets[row[1]] || buckets['Outreach']).push({ sponsorName: row[2], contactEmail: row[3] });
     });
 
-    sendDailyDigest(buckets['Outreach'], buckets['Follow-up'], buckets['Prospect'], buckets['Email Found']);
+    // The sheet round-trip above re-reads every row (regardless of type) into the generic
+    // {sponsorName, contactEmail} shape -- but for 'Skipped' rows, the "Contact Email" column
+    // actually holds the skip reason (see logSkipsForDigest_ above), and formatSkippedForDigest_
+    // groups by `.reason`, not `.contactEmail`. Without this remap every skip would print as
+    // "unknown reason" in the digest.
+    var skippedForDigest = buckets['Skipped'].map(function (item) {
+      return { sponsorName: item.sponsorName, reason: item.contactEmail };
+    });
+    sendDailyDigest(buckets['Outreach'], buckets['Follow-up'], buckets['Prospect'], buckets['Email Found'], skippedForDigest);
 
     if (rows.length) sheet.deleteRows(2, rows.length);
   } finally {
@@ -58,7 +79,7 @@ function sendScheduledDigest() {
   }
 }
 
-function sendDailyDigest(draftsCreated, followUpsSent, prospectsAdded, emailsFound) {
+function sendDailyDigest(draftsCreated, followUpsSent, prospectsAdded, emailsFound, skipped) {
   var recipients = getDigestRecipient_()
     .split(',')
     .map(function (email) { return email.trim(); })
@@ -90,6 +111,10 @@ function sendDailyDigest(draftsCreated, followUpsSent, prospectsAdded, emailsFou
   prospectsAdded.forEach(function (p) {
     lines.push('  - ' + p.sponsorName + ' -> ' + p.contactEmail);
   });
+
+  lines.push('');
+  lines.push('Skipped this run (grouped by reason):');
+  lines.push.apply(lines, formatSkippedForDigest_(skipped || []));
 
   MailApp.sendEmail({
     to: recipients,
