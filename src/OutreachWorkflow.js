@@ -29,13 +29,20 @@ function runDailyOutreach() {
     return;
   }
 
+  var startMs = Date.now();
   try {
     var sponsors = getUncontactedSponsors();
     var draftsCreated = [];
     var emailsHandledThisRun = {};
     var draftCountByReviewer = {};
 
-    sponsors.forEach(function (sponsor) {
+    for (var s = 0; s < sponsors.length; s++) {
+      if (!hasTimeBudgetRemaining_(startMs, Date.now(), OUTREACH_RUN_TIME_BUDGET_MS)) {
+        Logger.log('Stopping with ' + (sponsors.length - s) + ' sponsor(s) left to stay under the execution ' +
+          'time limit; they are still "Brainstormed" and will be picked up by the next run.');
+        break;
+      }
+      var sponsor = sponsors[s];
       try {
         var reviewerEmail = getResponsibleEmail_(sponsor.responsible);
         if (!reviewerEmail) {
@@ -73,7 +80,7 @@ function runDailyOutreach() {
       } catch (err) {
         Logger.log('Failed to process ' + sponsor.sponsorName + ': ' + err.message);
       }
-    });
+    }
 
     var followUpsSent = runFollowUpsInternal_();
     logForDigest_('Outreach', draftsCreated);
